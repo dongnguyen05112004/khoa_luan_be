@@ -21,6 +21,8 @@ class MemberProfileController extends Controller
             'user_id'           => 'required|exists:users,id|unique:member_profiles',
             'date_of_birth'     => 'nullable|date',
             'join_date'         => 'nullable|date',
+            'profile_picture'   => 'nullable|string|max:255',
+            'membership_type'   => 'nullable|string|max:50',
             'emergency_contact' => 'nullable|string|max:100',
             'health_notes'      => 'nullable|string',
         ]);
@@ -40,6 +42,8 @@ class MemberProfileController extends Controller
         $data = $request->validate([
             'date_of_birth'     => 'nullable|date',
             'join_date'         => 'nullable|date',
+            'profile_picture'   => 'nullable|string|max:255',
+            'membership_type'   => 'nullable|string|max:50',
             'emergency_contact' => 'nullable|string|max:100',
             'health_notes'      => 'nullable|string',
         ]);

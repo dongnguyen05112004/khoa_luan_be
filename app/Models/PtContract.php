@@ -11,7 +11,7 @@ class PtContract extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'trainer_id', 'total_sessions', 'used_sessions',
+        'user_id', 'trainer_id', 'branch_id', 'total_sessions', 'used_sessions',
         'start_date', 'end_date', 'price', 'status',
     ];
 
@@ -28,6 +28,11 @@ class PtContract extends Model
     public function trainer()
     {
         return $this->belongsTo(Trainer::class);
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function bookings()

@@ -27,7 +27,8 @@ class MemberFeedbackController extends Controller
             'trainer_id'   => 'nullable|exists:trainers,id',
             'class_id'     => 'nullable|exists:classes,id',
             'rating'       => 'nullable|integer|min:1|max:5',
-            'email'        => 'nullable|string',
+            'comment'      => 'nullable|string',
+            'title'        => 'nullable|string|max:200',
             'ai_sentiment' => 'nullable|string',
             'ai_score'     => 'nullable|numeric',
         ]);
@@ -46,7 +47,8 @@ class MemberFeedbackController extends Controller
         $fb = MemberFeedback::findOrFail($id);
         $data = $request->validate([
             'rating'       => 'nullable|integer|min:1|max:5',
-            'email'        => 'nullable|string',
+            'comment'      => 'nullable|string',
+            'title'        => 'nullable|string|max:200',
             'ai_sentiment' => 'nullable|string',
             'ai_score'     => 'nullable|numeric',
         ]);

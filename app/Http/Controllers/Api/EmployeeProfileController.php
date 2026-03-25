@@ -18,9 +18,11 @@ class EmployeeProfileController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'user_id'   => 'required|exists:users,id|unique:employee_profiles',
-            'hire_date' => 'nullable|date',
-            'salary'    => 'nullable|numeric|min:0',
+            'user_id'    => 'required|exists:users,id|unique:employee_profiles',
+            'hire_date'  => 'nullable|date',
+            'position'   => 'nullable|string|max:100',
+            'department' => 'nullable|string|max:100',
+            'salary'     => 'nullable|numeric|min:0',
         ]);
         return response()->json(EmployeeProfile::create($data)->load('user'), 201);
     }
@@ -36,8 +38,10 @@ class EmployeeProfileController extends Controller
     {
         $profile = EmployeeProfile::findOrFail($id);
         $data = $request->validate([
-            'hire_date' => 'nullable|date',
-            'salary'    => 'nullable|numeric|min:0',
+            'hire_date'  => 'nullable|date',
+            'position'   => 'nullable|string|max:100',
+            'department' => 'nullable|string|max:100',
+            'salary'     => 'nullable|numeric|min:0',
         ]);
         $profile->update($data);
         return response()->json($profile);

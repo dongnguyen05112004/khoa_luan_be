@@ -12,7 +12,7 @@ class Payment extends Model
 
     protected $fillable = [
         'invoice_number', 'user_id', 'subscription_id', 'payable_id', 'payable_type',
-        'amount', 'payment_date', 'payment_method', 'status', 'promotion_id', 'note',
+        'amount', 'payment_date', 'payment_method', 'status', 'payment_confirmed', 'promotion_id', 'note',
     ];
 
     protected $casts = ['payment_date' => 'date'];

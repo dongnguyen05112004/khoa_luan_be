@@ -11,7 +11,7 @@ class Promotion extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'title', 'description', 'discount', 'start_date', 'end_date', 'usage_limit',
+        'title', 'code', 'description', 'discount', 'start_date', 'end_date', 'usage_limit',
     ];
 
     protected $casts = [

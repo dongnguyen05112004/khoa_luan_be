@@ -28,6 +28,7 @@ class HealthMetricController extends Controller
             'height'              => 'nullable|numeric|min:0',
             'body_fat_percentage' => 'nullable|numeric|min:0|max:100',
             'muscle_mass_kg'      => 'nullable|numeric|min:0',
+            'bmi'                 => 'nullable|numeric|min:0',
         ]);
         return response()->json(HealthMetric::create($data)->load('user'), 201);
     }
@@ -48,6 +49,7 @@ class HealthMetricController extends Controller
             'height'              => 'nullable|numeric|min:0',
             'body_fat_percentage' => 'nullable|numeric|min:0|max:100',
             'muscle_mass_kg'      => 'nullable|numeric|min:0',
+            'bmi'                 => 'nullable|numeric|min:0',
         ]);
         $metric->update($data);
         return response()->json($metric);

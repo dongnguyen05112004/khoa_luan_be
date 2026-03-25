@@ -24,6 +24,7 @@ class EquipmentController extends Controller
     {
         $data = $request->validate([
             'equipment_name' => 'required|string|max:150',
+            'serial_number'  => 'nullable|string|max:100|unique:equipment',
             'branch_id'      => 'nullable|exists:branches,id',
             'purchase_date'  => 'nullable|date',
             'status'         => 'nullable|in:good,maintenance,broken',
@@ -43,6 +44,7 @@ class EquipmentController extends Controller
         $eq = Equipment::findOrFail($id);
         $data = $request->validate([
             'equipment_name' => 'sometimes|string|max:150',
+            'serial_number'  => 'nullable|string|max:100|unique:equipment,serial_number,' . $id,
             'branch_id'      => 'nullable|exists:branches,id',
             'purchase_date'  => 'nullable|date',
             'status'         => 'nullable|in:good,maintenance,broken',

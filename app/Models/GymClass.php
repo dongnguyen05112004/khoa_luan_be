@@ -13,7 +13,7 @@ class GymClass extends Model
     protected $table = 'classes';
 
     protected $fillable = [
-        'class_name', 'trainer_id', 'branch_id', 'max_members', 'class_cost', 'description',
+        'class_name', 'trainer_id', 'branch_id', 'max_members', 'class_cost', 'description', 'schedule_date',
     ];
 
     public function trainer()

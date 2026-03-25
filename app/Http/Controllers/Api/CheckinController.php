@@ -24,13 +24,14 @@ class CheckinController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'user_id'      => 'required|exists:users,id',
-            'branch_id'    => 'nullable|exists:branches,id',
-            'check_in_at'  => 'required|date',
-            'check_out_at' => 'nullable|date|after:check_in_at',
-            'duration'     => 'nullable|integer|min:0',
-            'schedule_done'=> 'nullable|boolean',
-            'method'       => 'nullable|in:qr,face,manual',
+            'user_id'       => 'required|exists:users,id',
+            'branch_id'     => 'nullable|exists:branches,id',
+            'check_in_at'   => 'required|date',
+            'check_out_at'  => 'nullable|date|after:check_in_at',
+            'duration'      => 'nullable|integer|min:0',
+            'schedule_done' => 'nullable|boolean',
+            'method'        => 'nullable|in:qr,face,manual',
+            'notes'         => 'nullable|string',
         ]);
         return response()->json(Checkin::create($data)->load(['user', 'branch']), 201);
     }
@@ -49,6 +50,7 @@ class CheckinController extends Controller
             'check_out_at'  => 'nullable|date',
             'duration'      => 'nullable|integer|min:0',
             'schedule_done' => 'nullable|boolean',
+            'notes'         => 'nullable|string',
         ]);
         $checkin->update($data);
         return response()->json($checkin);

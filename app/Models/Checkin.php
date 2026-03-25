@@ -11,7 +11,7 @@ class Checkin extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'branch_id', 'check_in_at', 'check_out_at', 'duration', 'schedule_done', 'method',
+        'user_id', 'branch_id', 'check_in_at', 'check_out_at', 'duration', 'schedule_done', 'method', 'notes',
     ];
 
     protected $casts = [

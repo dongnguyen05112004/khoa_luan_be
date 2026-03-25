@@ -10,7 +10,7 @@ class Equipment extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['equipment_name', 'branch_id', 'purchase_date', 'status'];
+    protected $fillable = ['equipment_name', 'serial_number', 'branch_id', 'purchase_date', 'status'];
 
     protected $casts = ['purchase_date' => 'date'];
 

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class HealthMetric extends Model
 {
     protected $fillable = [
-        'user_id', 'record_date', 'weight', 'height', 'body_fat_percentage', 'muscle_mass_kg',
+        'user_id', 'record_date', 'weight', 'height', 'body_fat_percentage', 'muscle_mass_kg', 'bmi',
     ];
 
     protected $casts = ['record_date' => 'date'];
