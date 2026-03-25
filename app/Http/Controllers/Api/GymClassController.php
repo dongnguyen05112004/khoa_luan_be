@@ -23,12 +23,13 @@ class GymClassController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'class_name'  => 'required|string|max:150',
-            'trainer_id'  => 'nullable|exists:trainers,id',
-            'branch_id'   => 'nullable|exists:branches,id',
-            'max_members' => 'nullable|integer|min:1',
-            'class_cost'  => 'nullable|numeric|min:0',
-            'description' => 'nullable|string',
+            'class_name'    => 'required|string|max:150',
+            'trainer_id'    => 'nullable|exists:trainers,id',
+            'branch_id'     => 'nullable|exists:branches,id',
+            'max_members'   => 'nullable|integer|min:1',
+            'class_cost'    => 'nullable|numeric|min:0',
+            'description'   => 'nullable|string',
+            'schedule_date' => 'nullable|date_format:Y-m-d H:i:s',
         ]);
         return response()->json(GymClass::create($data)->load(['trainer.user', 'branch']), 201);
     }
@@ -44,12 +45,13 @@ class GymClassController extends Controller
     {
         $class = GymClass::findOrFail($id);
         $data = $request->validate([
-            'class_name'  => 'sometimes|string|max:150',
-            'trainer_id'  => 'nullable|exists:trainers,id',
-            'branch_id'   => 'nullable|exists:branches,id',
-            'max_members' => 'nullable|integer|min:1',
-            'class_cost'  => 'nullable|numeric|min:0',
-            'description' => 'nullable|string',
+            'class_name'    => 'sometimes|string|max:150',
+            'trainer_id'    => 'nullable|exists:trainers,id',
+            'branch_id'     => 'nullable|exists:branches,id',
+            'max_members'   => 'nullable|integer|min:1',
+            'class_cost'    => 'nullable|numeric|min:0',
+            'description'   => 'nullable|string',
+            'schedule_date' => 'nullable|date_format:Y-m-d H:i:s',
         ]);
         $class->update($data);
         return response()->json($class->load(['trainer.user', 'branch']));

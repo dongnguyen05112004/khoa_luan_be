@@ -24,6 +24,8 @@ class TrainerController extends Controller
             'user_id'        => 'required|exists:users,id|unique:trainers',
             'branch_id'      => 'nullable|exists:branches,id',
             'specialization' => 'nullable|string|max:150',
+            'experience'     => 'nullable|integer|min:0|max:127',
+            'description'    => 'nullable|string',
             'pt_rate'        => 'nullable|numeric|min:0',
             'max_sessions'   => 'nullable|integer|min:0',
         ]);
@@ -43,6 +45,8 @@ class TrainerController extends Controller
         $data = $request->validate([
             'branch_id'      => 'nullable|exists:branches,id',
             'specialization' => 'nullable|string|max:150',
+            'experience'     => 'nullable|integer|min:0|max:127',
+            'description'    => 'nullable|string',
             'pt_rate'        => 'nullable|numeric|min:0',
             'max_sessions'   => 'nullable|integer|min:0',
         ]);

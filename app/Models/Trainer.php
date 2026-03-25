@@ -11,7 +11,7 @@ class Trainer extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'branch_id', 'specialization', 'pt_rate', 'max_sessions',
+        'user_id', 'branch_id', 'specialization', 'experience', 'description', 'pt_rate', 'max_sessions',
     ];
 
     public function user()

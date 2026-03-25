@@ -13,7 +13,7 @@ class MemberFeedback extends Model
     protected $table = 'member_feedbacks';
 
     protected $fillable = [
-        'user_id', 'trainer_id', 'class_id', 'rating', 'email', 'ai_sentiment', 'ai_score',
+        'user_id', 'trainer_id', 'class_id', 'rating', 'comment', 'title', 'email', 'ai_sentiment', 'ai_score',
     ];
 
     public function user()

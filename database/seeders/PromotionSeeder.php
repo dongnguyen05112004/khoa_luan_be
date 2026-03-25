@@ -12,6 +12,7 @@ class PromotionSeeder extends Seeder
         $promotions = [
             [
                 'title'       => 'Khai Trương Tháng 4',
+                'code'        => 'KHAI-TRUONG-T4',
                 'description' => 'Giảm 20% tất cả gói tập nhân dịp khai trương chi nhánh mới',
                 'discount'    => 20.00,
                 'start_date'  => '2026-04-01',
@@ -20,6 +21,7 @@ class PromotionSeeder extends Seeder
             ],
             [
                 'title'       => 'Combo Mùa Hè',
+                'code'        => 'SUMMER2026',
                 'description' => 'Đăng ký gói 3 tháng giảm 15%',
                 'discount'    => 15.00,
                 'start_date'  => '2026-06-01',
@@ -28,6 +30,7 @@ class PromotionSeeder extends Seeder
             ],
             [
                 'title'       => 'Ưu Đãi Sinh Nhật',
+                'code'        => 'BIRTHDAY10',
                 'description' => 'Giảm 10% cho hội viên có sinh nhật trong tháng',
                 'discount'    => 10.00,
                 'start_date'  => '2026-01-01',
@@ -36,6 +39,7 @@ class PromotionSeeder extends Seeder
             ],
             [
                 'title'       => 'Flash Sale Cuối Tuần',
+                'code'        => 'FLASH30',
                 'description' => 'Giảm 30% gói 1 tháng vào cuối tuần',
                 'discount'    => 30.00,
                 'start_date'  => '2026-03-20',

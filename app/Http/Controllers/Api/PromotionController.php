@@ -19,6 +19,7 @@ class PromotionController extends Controller
     {
         $data = $request->validate([
             'title'       => 'required|string|max:150',
+            'code'        => 'nullable|string|max:50|unique:promotions',
             'description' => 'nullable|string',
             'discount'    => 'nullable|numeric|min:0|max:100',
             'start_date'  => 'nullable|date',
@@ -40,6 +41,7 @@ class PromotionController extends Controller
         $promotion = Promotion::findOrFail($id);
         $data = $request->validate([
             'title'       => 'sometimes|string|max:150',
+            'code'        => 'nullable|string|max:50|unique:promotions,code,' . $id,
             'description' => 'nullable|string',
             'discount'    => 'nullable|numeric|min:0|max:100',
             'start_date'  => 'nullable|date',

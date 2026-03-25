@@ -25,15 +25,16 @@ class PaymentController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'invoice_number' => 'nullable|string|max:50|unique:payments',
-            'user_id'        => 'required|exists:users,id',
-            'subscription_id'=> 'nullable|exists:member_subscriptions,id',
-            'amount'         => 'required|numeric|min:0',
-            'payment_date'   => 'nullable|date',
-            'payment_method' => 'nullable|string|max:50',
-            'status'         => 'nullable|in:pending,paid,refunded',
-            'promotion_id'   => 'nullable|exists:promotions,id',
-            'note'           => 'nullable|string',
+            'invoice_number'  => 'nullable|string|max:50|unique:payments',
+            'user_id'         => 'required|exists:users,id',
+            'subscription_id' => 'nullable|exists:member_subscriptions,id',
+            'amount'          => 'required|numeric|min:0',
+            'payment_date'    => 'nullable|date',
+            'payment_method'  => 'nullable|string|max:50',
+            'status'          => 'nullable|in:pending,paid,refunded',
+            'payment_confirmed'=> 'nullable|boolean',
+            'promotion_id'    => 'nullable|exists:promotions,id',
+            'note'            => 'nullable|string',
         ]);
         return response()->json(Payment::create($data)->load(['user', 'subscription.plan']), 201);
     }
@@ -49,10 +50,11 @@ class PaymentController extends Controller
     {
         $payment = Payment::findOrFail($id);
         $data = $request->validate([
-            'status'         => 'sometimes|in:pending,paid,refunded',
-            'payment_method' => 'nullable|string|max:50',
-            'payment_date'   => 'nullable|date',
-            'note'           => 'nullable|string',
+            'status'           => 'sometimes|in:pending,paid,refunded',
+            'payment_method'   => 'nullable|string|max:50',
+            'payment_date'     => 'nullable|date',
+            'payment_confirmed'=> 'nullable|boolean',
+            'note'             => 'nullable|string',
         ]);
         $payment->update($data);
         return response()->json($payment);

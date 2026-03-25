@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class MemberProfile extends Model
 {
     protected $fillable = [
-        'user_id', 'date_of_birth', 'join_date', 'emergency_contact', 'health_notes',
+        'user_id', 'date_of_birth', 'join_date', 'profile_picture', 'membership_type', 'emergency_contact', 'health_notes',
     ];
 
     protected $casts = [

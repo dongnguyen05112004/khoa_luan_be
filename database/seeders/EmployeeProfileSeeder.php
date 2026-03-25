@@ -14,9 +14,9 @@ class EmployeeProfileSeeder extends Seeder
         $staffUsers = User::whereIn('role_id', [1, 2, 3])->get();
 
         $data = [
-            ['hire_date' => '2021-01-15', 'salary' => 25000000],
-            ['hire_date' => '2022-03-01', 'salary' => 18000000],
-            ['hire_date' => '2023-06-10', 'salary' => 12000000],
+            ['hire_date' => '2021-01-15', 'position' => 'Giám đốc',        'department' => 'Ban lãnh đạo',   'salary' => 25000000],
+            ['hire_date' => '2022-03-01', 'position' => 'Quản lý chi nhánh','department' => 'Quản lý',        'salary' => 18000000],
+            ['hire_date' => '2023-06-10', 'position' => 'Nhân viên lễ tân', 'department' => 'Chăm sóc KH',   'salary' => 12000000],
         ];
 
         foreach ($staffUsers as $i => $user) {

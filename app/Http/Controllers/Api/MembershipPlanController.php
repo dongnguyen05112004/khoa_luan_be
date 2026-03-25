@@ -21,6 +21,7 @@ class MembershipPlanController extends Controller
             'plan_name'     => 'required|string|max:150',
             'duration_days' => 'required|integer|min:1',
             'price'         => 'required|numeric|min:0',
+            'value'         => 'nullable|numeric|min:0',
             'description'   => 'nullable|string',
             'status'        => 'nullable|in:active,inactive',
         ]);
@@ -41,6 +42,7 @@ class MembershipPlanController extends Controller
             'plan_name'     => 'sometimes|string|max:150',
             'duration_days' => 'sometimes|integer|min:1',
             'price'         => 'sometimes|numeric|min:0',
+            'value'         => 'nullable|numeric|min:0',
             'description'   => 'nullable|string',
             'status'        => 'nullable|in:active,inactive',
         ]);
