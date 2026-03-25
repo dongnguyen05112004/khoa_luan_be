@@ -43,4 +43,8 @@ class Branch extends Model
     {
         return $this->hasMany(OtherExpense::class);
     }
+    public function payments()
+    {
+        return $this->hasManyThrough(Payment::class, User::class, 'branch_id', 'user_id');
+    }
 }

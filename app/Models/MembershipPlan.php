@@ -16,4 +16,16 @@ class MembershipPlan extends Model
     {
         return $this->hasMany(MemberSubscription::class, 'plan_id');
     }
+
+    // Chỉ lấy các gói tập đang mở bán
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }
+    // Tính tổng doanh thu thực tế mà gói tập này đã mang lại
+    public function getTotalRevenueAttribute()
+    {
+        // Sum cột 'price' từ các đăng ký (subscriptions) của gói này
+        return $this->subscriptions()->sum('price');
+    }
 }

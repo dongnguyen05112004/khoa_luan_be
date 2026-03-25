@@ -35,4 +35,15 @@ class GymClass extends Model
     {
         return $this->hasMany(MemberFeedback::class, 'class_id');
     }
+    // Tính số lượng hội viên đã đăng ký lớp này
+    public function getRegisteredCountAttribute()
+    {
+        return $this->registrations()->count();
+    }
+
+    // Kiểm tra xem lớp đã đầy chưa
+    public function getIsFullAttribute()
+    {
+        return $this->registered_count >= $this->max_members;
+    }
 }
