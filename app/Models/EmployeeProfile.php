@@ -14,4 +14,9 @@ class EmployeeProfile extends Model
     {
         return $this->belongsTo(User::class);
     }
+    public function branch()
+    {
+        // Lấy branch_id trực tiếp từ bảng users
+        return $this->user->branch();
+    }
 }

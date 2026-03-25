@@ -38,4 +38,16 @@ class MemberSubscription extends Model
     {
         return $this->hasMany(Payment::class, 'subscription_id');
     }
+
+    // Lấy các gói tập sắp hết hạn trong 7 ngày tới
+    public function scopeExpiringSoon($query)
+    {
+        return $query->where('status', 'active')
+                    ->whereBetween('end_date', [now(), now()->addDays(7)]);
+    }
+    // Kiểm tra xem đăng ký này có dùng khuyến mãi không
+    public function getHasPromotionAttribute()
+    {
+        return !is_null($this->promotion_id);
+    }
 }

@@ -31,4 +31,17 @@ class Payment extends Model
     {
         return $this->belongsTo(Promotion::class);
     }
+
+    // Chỉ lấy các thanh toán đã thành công
+    public function scopePaid($query)
+    {
+        return $query->where('status', 'paid');
+    }
+
+    // Tính tổng tiền đã thu trong một khoảng thời gian
+    public function scopeRevenueBetween($query, $from, $to)
+    {
+        return $query->where('status', 'paid')
+                    ->whereBetween('payment_date', [$from, $to]);
+    }
 }

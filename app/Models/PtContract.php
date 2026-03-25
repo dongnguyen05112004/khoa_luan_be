@@ -39,4 +39,15 @@ class PtContract extends Model
     {
         return $this->hasMany(PtBooking::class, 'contract_id');
     }
+    public function getRemainingSessionsAttribute()
+    {
+        // Trả về số buổi chưa tập
+        return max(0, $this->total_sessions - $this->used_sessions);
+    }
+    // Lọc các hợp đồng còn ít hơn 3 buổi tập (Dữ liệu cho AI gợi ý bán thêm - Upsell)
+    public function scopeRunningOut($query)
+    {
+        return $query->where('status', 'active')
+                    ->whereRaw('(total_sessions - used_sessions) <= 3');
+    }
 }
