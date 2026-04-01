@@ -92,71 +92,30 @@ class UserSeeder extends Seeder
                 'card_number' => 'PT003',
                 'state'       => 'active',
             ],
-            // Members
-            [
-                'name'        => 'Hội Viên 1',
-                'full_name'   => 'Nguyễn Văn An',
-                'email'       => 'member1@gmail.com',
-                'password'    => Hash::make('password'),
-                'role_id'     => 5,
-                'branch_id'   => 1,
-                'phone'       => '0905000001',
-                'gender'      => 'male',
-                'card_number' => 'MBR001',
-                'state'       => 'active',
-            ],
-            [
-                'name'        => 'Hội Viên 2',
-                'full_name'   => 'Trần Thị Bình',
-                'email'       => 'member2@gmail.com',
-                'password'    => Hash::make('password'),
-                'role_id'     => 5,
-                'branch_id'   => 1,
-                'phone'       => '0905000002',
-                'gender'      => 'female',
-                'card_number' => 'MBR002',
-                'state'       => 'active',
-            ],
-            [
-                'name'        => 'Hội Viên 3',
-                'full_name'   => 'Lê Văn Cường',
-                'email'       => 'member3@gmail.com',
-                'password'    => Hash::make('password'),
-                'role_id'     => 5,
-                'branch_id'   => 2,
-                'phone'       => '0905000003',
-                'gender'      => 'male',
-                'card_number' => 'MBR003',
-                'state'       => 'active',
-            ],
-            [
-                'name'        => 'Hội Viên 4',
-                'full_name'   => 'Phạm Thị Dung',
-                'email'       => 'member4@gmail.com',
-                'password'    => Hash::make('password'),
-                'role_id'     => 5,
-                'branch_id'   => 2,
-                'phone'       => '0905000004',
-                'gender'      => 'female',
-                'card_number' => 'MBR004',
-                'state'       => 'active',
-            ],
-            [
-                'name'        => 'Hội Viên 5',
-                'full_name'   => 'Hoàng Văn Em',
-                'email'       => 'member5@gmail.com',
-                'password'    => Hash::make('password'),
-                'role_id'     => 5,
-                'branch_id'   => 3,
-                'phone'       => '0905000005',
-                'gender'      => 'male',
-                'card_number' => 'MBR005',
-                'state'       => 'active',
-            ],
         ];
 
         foreach ($users as $user) {
             User::firstOrCreate(['email' => $user['email']], $user);
+        }
+
+        // Tạo 300 Hội viên cho Cơ sở 1 bằng Faker
+        $faker = \Faker\Factory::create('vi_VN');
+        for ($i = 1; $i <= 300; $i++) {
+            $email = "member{$i}_b1@gmail.com";
+            User::firstOrCreate(
+                ['email' => $email],
+                [
+                    'name'        => "Hội Viên {$i}",
+                    'full_name'   => $faker->name,
+                    'password'    => Hash::make('password'),
+                    'role_id'     => 5,
+                    'branch_id'   => 1,
+                    'phone'       => "09" . $faker->numerify('########'),
+                    'gender'      => $faker->randomElement(['male', 'female']),
+                    'card_number' => 'MBR1' . str_pad($i, 3, '0', STR_PAD_LEFT),
+                    'state'       => 'active',
+                ]
+            );
         }
     }
 }

@@ -12,53 +12,30 @@ class PtContractSeeder extends Seeder
 {
     public function run(): void
     {
-        $members  = User::where('role_id', 5)->get();
-        $trainers = Trainer::all();
+        $members  = User::where('role_id', 5)->where('branch_id', 1)->get();
+        $trainers = Trainer::where('branch_id', 1)->get();
         if ($members->isEmpty() || $trainers->isEmpty()) return;
 
-        $contracts = [
-            [
-                'user_id'        => $members->get(0)?->id,
-                'trainer_id'     => $trainers->first()->id,
-                'branch_id'      => 1,
-                'total_sessions' => 10,
-                'used_sessions'  => 4,
-                'start_date'     => '2026-01-10',
-                'end_date'       => '2026-03-10',
-                'price'          => 3000000,
-                'status'         => 'active',
-            ],
-            [
-                'user_id'        => $members->get(2)?->id,
-                'trainer_id'     => $trainers->get(1)?->id ?? $trainers->first()->id,
-                'branch_id'      => 2,
-                'total_sessions' => 20,
-                'used_sessions'  => 8,
-                'start_date'     => '2026-02-01',
-                'end_date'       => '2026-05-01',
-                'price'          => 5500000,
-                'status'         => 'active',
-            ],
-            [
-                'user_id'        => $members->get(4)?->id,
-                'trainer_id'     => $trainers->first()->id,
-                'branch_id'      => 3,
-                'total_sessions' => 10,
-                'used_sessions'  => 10,
-                'start_date'     => '2025-11-01',
-                'end_date'       => '2026-01-01',
-                'price'          => 3000000,
-                'status'         => 'completed',
-            ],
-        ];
+        // Give PT contracts to about 20% of members
+        $ptMembers = $members->random(max(1, intval($members->count() * 0.2)));
+        
+        foreach ($ptMembers as $member) {
+            $startDate = \Carbon\Carbon::now()->subDays(rand(10, 80));
+            $totalSessions = rand(10, 30);
+            $usedSessions = rand(0, $totalSessions);
+            $endDate = (clone $startDate)->addMonths(3);
 
-        foreach ($contracts as $contract) {
-            if ($contract['user_id']) {
-                PtContract::firstOrCreate(
-                    ['user_id' => $contract['user_id'], 'trainer_id' => $contract['trainer_id'], 'start_date' => $contract['start_date']],
-                    $contract
-                );
-            }
+            PtContract::create([
+                'user_id'        => $member->id,
+                'trainer_id'     => $trainers->random()->id,
+                'branch_id'      => 1,
+                'total_sessions' => $totalSessions,
+                'used_sessions'  => $usedSessions,
+                'start_date'     => $startDate->toDateString(),
+                'end_date'       => $endDate->toDateString(),
+                'price'          => $totalSessions * 300000,
+                'status'         => $usedSessions == $totalSessions ? 'completed' : 'active',
+            ]);
         }
     }
 }

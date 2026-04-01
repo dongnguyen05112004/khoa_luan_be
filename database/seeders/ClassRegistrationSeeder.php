@@ -11,24 +11,23 @@ class ClassRegistrationSeeder extends Seeder
 {
     public function run(): void
     {
-        $members = User::where('role_id', 5)->get();
-        $classes = GymClass::all();
+        $members = User::where('role_id', 5)->where('branch_id', 1)->get();
+        $classes = GymClass::where('branch_id', 1)->get();
         if ($members->isEmpty() || $classes->isEmpty()) return;
 
-        $registrations = [
-            ['user_id' => $members->get(0)?->id, 'class_id' => $classes->get(0)?->id, 'registration_date' => '2026-01-15', 'status' => 'registered'],
-            ['user_id' => $members->get(0)?->id, 'class_id' => $classes->get(4)?->id ?? $classes->first()->id, 'registration_date' => '2026-02-01', 'status' => 'completed'],
-            ['user_id' => $members->get(1)?->id, 'class_id' => $classes->get(1)?->id ?? $classes->first()->id, 'registration_date' => '2026-01-20', 'status' => 'registered'],
-            ['user_id' => $members->get(2)?->id, 'class_id' => $classes->get(2)?->id ?? $classes->first()->id, 'registration_date' => '2026-02-05', 'status' => 'registered'],
-            ['user_id' => $members->get(3)?->id, 'class_id' => $classes->get(0)?->id, 'registration_date' => '2026-01-15', 'status' => 'cancelled'],
-        ];
-
-        foreach ($registrations as $reg) {
-            if ($reg['user_id'] && $reg['class_id']) {
-                ClassRegistration::firstOrCreate(
-                    ['user_id' => $reg['user_id'], 'class_id' => $reg['class_id']],
-                    $reg
-                );
+        foreach ($classes as $class) {
+            // Register 10-40 members per class
+            $registeredMembers = $members->random(rand(10, min(40, $members->count())));
+            foreach ($registeredMembers as $member) {
+                // Determine registration date 1-3 days before class
+                $registrationDate = \Carbon\Carbon::parse($class->schedule_date)->subDays(rand(1, 3));
+                
+                ClassRegistration::create([
+                    'user_id' => $member->id,
+                    'class_id' => $class->id,
+                    'registration_date' => $registrationDate->toDateString(),
+                    'status' => rand(1, 10) > 8 ? 'cancelled' : (\Carbon\Carbon::parse($class->schedule_date)->isPast() ? 'completed' : 'registered'),
+                ]);
             }
         }
     }
