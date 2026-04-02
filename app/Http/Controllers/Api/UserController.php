@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
+use App\Http\Resources\UserCollection;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -23,7 +25,7 @@ class UserController extends Controller
             }))
             ->paginate($request->per_page ?? 20);
 
-        return response()->json($users);
+        return new UserCollection($users);
     }
 
     /** POST /api/users */
@@ -45,7 +47,7 @@ class UserController extends Controller
         ]);
         $data['password'] = Hash::make($data['password']);
         $user = User::create($data);
-        return response()->json($user->load(['role', 'branch']), 201);
+        return new UserResource($user->load(['role', 'branch']));
     }
 
     /** GET /api/users/{id} */
@@ -55,7 +57,7 @@ class UserController extends Controller
             'role', 'branch', 'memberProfile', 'employeeProfile',
             'trainer', 'activeSubscription.plan',
         ])->findOrFail($id);
-        return response()->json($user);
+        return new UserResource($user);
     }
 
     /** PUT /api/users/{id} */
@@ -80,7 +82,7 @@ class UserController extends Controller
             $data['password'] = Hash::make($data['password']);
         }
         $user->update($data);
-        return response()->json($user->load(['role', 'branch']));
+        return new UserResource($user->load(['role', 'branch']));
     }
 
     /** DELETE /api/users/{id} */
@@ -94,20 +96,23 @@ class UserController extends Controller
     public function subscriptions($id)
     {
         $user = User::findOrFail($id);
-        return response()->json($user->subscriptions()->with('plan', 'promotion')->get());
+        $subscriptions = $user->subscriptions()->with('plan', 'promotion')->get();
+        return response()->json($subscriptions);
     }
 
     /** GET /api/users/{id}/checkins */
     public function checkins($id)
     {
         $user = User::findOrFail($id);
-        return response()->json($user->checkins()->with('branch')->latest()->get());
+        $checkins = $user->checkins()->with('branch')->latest()->get();
+        return response()->json($checkins);
     }
 
     /** GET /api/users/{id}/health-metrics */
     public function healthMetrics($id)
     {
         $user = User::findOrFail($id);
-        return response()->json($user->healthMetrics()->orderBy('record_date', 'desc')->get());
+        $healthMetrics = $user->healthMetrics()->orderBy('record_date', 'desc')->get();
+        return response()->json($healthMetrics);
     }
 }
