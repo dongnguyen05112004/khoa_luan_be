@@ -115,4 +115,10 @@ class UserController extends Controller
         $healthMetrics = $user->healthMetrics()->orderBy('record_date', 'desc')->get();
         return response()->json($healthMetrics);
     }
+    /** GET /api/users/{id}/admin-get-user */
+    public function adminGetUser($id)
+    {
+        // $query = User::query()->
+    }
+
 }
