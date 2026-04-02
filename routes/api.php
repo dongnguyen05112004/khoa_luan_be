@@ -26,7 +26,7 @@ use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AiRecommendationController;
 use App\Http\Controllers\Api\BusinessReportController;
 use App\Http\Controllers\Api\SystemSettingController;
-
+use App\Models\User;
 /*
 |--------------------------------------------------------------------------
 | 1. XÁC THỰC (PUBLIC - không cần đăng nhập)
@@ -55,10 +55,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::resource('roles', RoleController::class);
 
     // Users
+    Route::get('/users/admin-get-user',  [UserController::class, 'adminGetUser'])
+        ->middleware('can:viewAny,' . User::class);
     Route::resource('users', UserController::class);
     Route::get('/users/{id}/subscriptions',   [UserController::class, 'subscriptions']);
     Route::get('/users/{id}/checkins',        [UserController::class, 'checkins']);
     Route::get('/users/{id}/health-metrics',  [UserController::class, 'healthMetrics']);
+
 
     // Employee Profiles
     Route::resource('employee-profiles', EmployeeProfileController::class);

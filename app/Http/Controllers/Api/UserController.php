@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
+use App\Http\Resources\UserListResource;
 use App\Http\Resources\UserCollection;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -114,5 +115,19 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $healthMetrics = $user->healthMetrics()->orderBy('record_date', 'desc')->get();
         return response()->json($healthMetrics);
+    }
+    /** GET /api/users/{id}/admin-get-user */
+    public function adminGetUser(Request $request)
+    {
+        // 1. Khởi tạo Query
+        $query = User::query()->with(['role', 'branch']);
+        //Lọc theo chi nhánh
+        $query->when($request->branch_id, function ($q, $branchId) {
+            return $q->where('branch_id', $branchId);
+        });
+        //phân trang
+        $users = $query->paginate($request->get('per_page', 15));
+
+        return UserListResource::collection($users);
     }
 }
