@@ -23,4 +23,20 @@ class Equipment extends Model
     {
         return $this->hasMany(EquipmentMaintenance::class);
     }
+    // Lấy danh sách máy đang hỏng
+    public function scopeBroken($query)
+    {
+        return $query->where('status', 'broken');
+    }
+
+    // Lấy danh sách máy đang bảo trì
+    public function scopeInMaintenance($query)
+    {
+        return $query->where('status', 'maintenance');
+    }
+    // Tính tổng chi phí bảo trì của thiết bị này từ trước đến nay
+    public function getTotalMaintenanceCostAttribute()
+    {
+        return $this->maintenances()->sum('cost');
+    }
 }

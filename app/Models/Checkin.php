@@ -29,4 +29,9 @@ class Checkin extends Model
     {
         return $this->belongsTo(Branch::class);
     }
+    // Quan hệ với bảng sức khỏe thông qua User
+    public function healthMetrics()
+    {
+        return $this->hasMany(HealthMetric::class, 'user_id', 'user_id');
+    }
 }

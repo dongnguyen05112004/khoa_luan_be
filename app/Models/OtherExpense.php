@@ -23,4 +23,10 @@ class OtherExpense extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+    // Lọc chi phí theo tháng và năm
+    public function scopeMonthly($query, $month, $year)
+    {
+        return $query->whereMonth('expense_date', $month)
+                    ->whereYear('expense_date', $year);
+    }
 }

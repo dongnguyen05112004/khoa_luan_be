@@ -24,8 +24,9 @@ class PaymentSeeder extends Seeder
                     'payment_date'   => $sub->start_date,
                     'payment_method' => ['cash', 'transfer', 'momo', 'vnpay'][$i % 4],
                     'status'         => $sub->status === 'active' ? 'paid' : 'paid',
-                    'note'           => 'Thanh toán gói tập ' . $sub->plan?->plan_name,
-                    'promotion_id'   => $sub->promotion_id,
+                    'note'              => 'Thanh toán gói tập ' . $sub->plan?->plan_name,
+                    'promotion_id'      => $sub->promotion_id,
+                    'payment_confirmed' => true,
                 ]
             );
         }

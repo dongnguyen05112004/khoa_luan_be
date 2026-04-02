@@ -12,68 +12,31 @@ class MemberFeedbackSeeder extends Seeder
 {
     public function run(): void
     {
-        $members  = User::where('role_id', 5)->get();
-        $trainers = Trainer::all();
-        $classes  = GymClass::all();
+        $members  = User::where('role_id', 5)->where('branch_id', 1)->get();
+        $trainers = Trainer::where('branch_id', 1)->get();
+        $classes  = GymClass::where('branch_id', 1)->get();
         if ($members->isEmpty()) return;
 
-        $feedbacks = [
-            [
-                'user_id'      => $members->get(0)?->id,
-                'trainer_id'   => $trainers->first()?->id,
-                'class_id'     => null,
-                'rating'       => 5,
-                'title'        => 'Huấn luyện viên tuyệt vời',
-                'comment'      => 'PT rất tận tâm, hướng dẫn chi tiết và động viên tốt. Cực kỳ hài lòng!',
-                'ai_sentiment' => 'positive',
-                'ai_score'     => 0.95,
-            ],
-            [
-                'user_id'      => $members->get(1)?->id,
-                'trainer_id'   => null,
-                'class_id'     => $classes->first()?->id,
-                'rating'       => 4,
-                'title'        => 'Lớp Yoga thư giãn',
-                'comment'      => 'Lớp Yoga rất thư giãn, nhạc nền phù hợp, chỉ hơi đông một chút.',
-                'ai_sentiment' => 'positive',
-                'ai_score'     => 0.78,
-            ],
-            [
-                'user_id'      => $members->get(2)?->id,
-                'trainer_id'   => $trainers->get(1)?->id,
-                'class_id'     => null,
-                'rating'       => 3,
-                'title'        => 'Cần cải thiện đúng giờ',
-                'comment'      => 'Huấn luyện viên ổn nhưng hay đến muộn, cần cải thiện đúng giờ hơn.',
-                'ai_sentiment' => 'neutral',
-                'ai_score'     => 0.45,
-            ],
-            [
-                'user_id'      => $members->get(3)?->id,
-                'trainer_id'   => null,
-                'class_id'     => $classes->get(1)?->id,
-                'rating'       => 5,
-                'title'        => 'Lớp Zumba cực vui!',
-                'comment'      => 'Lớp Zumba cực kỳ vui và năng động! Sẽ tiếp tục đăng ký.',
-                'ai_sentiment' => 'positive',
-                'ai_score'     => 0.98,
-            ],
-            [
-                'user_id'      => $members->get(4)?->id,
-                'trainer_id'   => null,
-                'class_id'     => null,
-                'rating'       => 2,
-                'title'        => 'Cơ sở vật chất cần cải thiện',
-                'comment'      => 'Máy lạnh bị hỏng từ tuần trước vẫn chưa được sửa, rất bức bối khi tập.',
-                'ai_sentiment' => 'negative',
-                'ai_score'     => 0.15,
-            ],
-        ];
+        $faker = \Faker\Factory::create('vi_VN');
 
-        foreach ($feedbacks as $fb) {
-            if ($fb['user_id']) {
-                MemberFeedback::create($fb);
-            }
+        for ($i = 0; $i < 200; $i++) {
+            $isTrainer = rand(0, 1) === 0;
+            $rating = rand(3, 5); // mostly positive
+            if (rand(1, 10) > 8) $rating = rand(1, 2); // some negative
+            
+            $aiSentiment = $rating >= 4 ? 'positive' : ($rating === 3 ? 'neutral' : 'negative');
+            $aiScore = $rating >= 4 ? (rand(70, 99) / 100) : ($rating === 3 ? (rand(40, 60) / 100) : (rand(10, 30) / 100));
+
+            MemberFeedback::create([
+                'user_id'      => $members->random()->id,
+                'trainer_id'   => $isTrainer && $trainers->isNotEmpty() ? $trainers->random()->id : null,
+                'class_id'     => !$isTrainer && $classes->isNotEmpty() ? $classes->random()->id : null,
+                'rating'       => $rating,
+                'title'        => 'Góp ý ngày ' . \Carbon\Carbon::now()->subDays(rand(1, 90))->format('d/m'),
+                'comment'      => $faker->paragraph(2),
+                'ai_sentiment' => $aiSentiment,
+                'ai_score'     => $aiScore,
+            ]);
         }
     }
 }

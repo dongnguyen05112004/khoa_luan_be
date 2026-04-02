@@ -12,34 +12,40 @@ class EquipmentSeeder extends Seeder
     public function run(): void
     {
         $technicianId = User::where('role_id', 3)->first()?->id;
+        $faker = \Faker\Factory::create('vi_VN');
 
-        $equipment = [
-            ['equipment_name' => 'Máy chạy bộ Treadmill A1', 'serial_number' => 'TRD-A1-001', 'branch_id' => 1, 'purchase_date' => '2023-01-15', 'status' => 'good'],
-            ['equipment_name' => 'Máy chạy bộ Treadmill A2', 'serial_number' => 'TRD-A2-002', 'branch_id' => 1, 'purchase_date' => '2023-01-15', 'status' => 'good'],
-            ['equipment_name' => 'Máy đạp xe Spin Bike B1',  'serial_number' => 'SPB-B1-003', 'branch_id' => 1, 'purchase_date' => '2023-03-20', 'status' => 'maintenance'],
-            ['equipment_name' => 'Bộ tạ đĩa Olympic Set',    'serial_number' => 'WTS-OL-004', 'branch_id' => 1, 'purchase_date' => '2022-06-10', 'status' => 'good'],
-            ['equipment_name' => 'Máy kéo cáp Cable Cross',  'serial_number' => 'CBL-CR-005', 'branch_id' => 2, 'purchase_date' => '2023-05-01', 'status' => 'good'],
-            ['equipment_name' => 'Ghế tập bụng AB Bench',    'serial_number' => 'ABB-AB-006', 'branch_id' => 2, 'purchase_date' => '2022-09-15', 'status' => 'broken'],
-            ['equipment_name' => 'Máy chạy bộ Treadmill B1', 'serial_number' => 'TRD-B1-007', 'branch_id' => 3, 'purchase_date' => '2024-01-10', 'status' => 'good'],
-            ['equipment_name' => 'Squat Rack Pro',            'serial_number' => 'SQR-PR-008', 'branch_id' => 3, 'purchase_date' => '2023-07-20', 'status' => 'good'],
-        ];
+        $equipmentNames = ['Máy chạy bộ Treadmill', 'Máy đạp xe Spin Bike', 'Bộ tạ đĩa Olympic', 'Máy kéo cáp Cable Cross', 'Ghế tập bụng AB Bench', 'Squat Rack Pro', 'Máy ép ngực Pec Deck', 'Dumbbell Rack'];
 
-        foreach ($equipment as $eq) {
+        for ($i = 1; $i <= 50; $i++) {
+            $purchaseDate = \Carbon\Carbon::now()->subDays(rand(30, 180));
             $created = Equipment::firstOrCreate(
-                ['equipment_name' => $eq['equipment_name'], 'branch_id' => $eq['branch_id']],
-                $eq
+                [
+                    'equipment_name' => $faker->randomElement($equipmentNames) . ' ' . $i,
+                    'branch_id' => 1
+                ],
+                [
+                    'serial_number' => 'EQ-B1-' . str_pad($i, 3, '0', STR_PAD_LEFT),
+                    'branch_id' => 1,
+                    'purchase_date' => $purchaseDate->toDateString(),
+                    'status' => $faker->randomElement(['good', 'good', 'good', 'maintenance', 'broken'])
+                ]
             );
 
-            // Tạo bảo trì nếu status là maintenance hoặc broken
-            if (in_array($eq['status'], ['maintenance', 'broken']) && $technicianId) {
+            if (in_array($created->status, ['maintenance', 'broken']) && $technicianId) {
+                // Generate a random maintenance date after purchase date
+                $maintenanceDate = (clone $purchaseDate)->addDays(rand(5, 30));
+                if ($maintenanceDate->isFuture()) {
+                    $maintenanceDate = \Carbon\Carbon::yesterday();
+                }
+
                 EquipmentMaintenance::firstOrCreate(
-                    ['equipment_id' => $created->id, 'maintenance_date' => '2026-03-10'],
+                    ['equipment_id' => $created->id, 'maintenance_date' => $maintenanceDate->toDateString()],
                     [
                         'equipment_id'    => $created->id,
                         'technician_id'   => $technicianId,
-                        'maintenance_date'=> '2026-03-10',
-                        'description'     => 'Kiểm tra và sửa chữa định kỳ',
-                        'cost'            => 500000,
+                        'maintenance_date'=> $maintenanceDate->toDateString(),
+                        'description'     => $faker->sentence(8),
+                        'cost'            => rand(5, 50) * 100000,
                     ]
                 );
             }

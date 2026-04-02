@@ -10,22 +10,33 @@ class CheckinSeeder extends Seeder
 {
     public function run(): void
     {
-        $members = User::whereIn('role_id', [4, 5])->get();
+        $members = User::whereIn('role_id', [4, 5])->where('branch_id', 1)->get();
         if ($members->isEmpty()) return;
 
-        $checkins = [
-            ['user_id' => $members->get(0)?->id, 'branch_id' => 1, 'check_in_at' => '2026-03-15 07:30:00', 'check_out_at' => '2026-03-15 09:15:00', 'duration' => 105, 'schedule_done' => true,  'method' => 'qr'],
-            ['user_id' => $members->get(0)?->id, 'branch_id' => 1, 'check_in_at' => '2026-03-17 08:00:00', 'check_out_at' => '2026-03-17 09:30:00', 'duration' => 90,  'schedule_done' => true,  'method' => 'qr'],
-            ['user_id' => $members->get(1)?->id, 'branch_id' => 1, 'check_in_at' => '2026-03-14 16:00:00', 'check_out_at' => '2026-03-14 17:45:00', 'duration' => 105, 'schedule_done' => true,  'method' => 'face'],
-            ['user_id' => $members->get(2)?->id, 'branch_id' => 2, 'check_in_at' => '2026-03-16 18:00:00', 'check_out_at' => null,                  'duration' => null,'schedule_done' => false, 'method' => 'manual'],
-            ['user_id' => $members->get(3)?->id, 'branch_id' => 2, 'check_in_at' => '2026-03-15 09:00:00', 'check_out_at' => '2026-03-15 10:30:00', 'duration' => 90,  'schedule_done' => true,  'method' => 'qr'],
-            ['user_id' => $members->get(4)?->id, 'branch_id' => 3, 'check_in_at' => '2026-03-13 07:00:00', 'check_out_at' => '2026-03-13 08:30:00', 'duration' => 90,  'schedule_done' => true,  'method' => 'face'],
-            ['user_id' => $members->get(0)?->id, 'branch_id' => 1, 'check_in_at' => '2026-03-18 07:30:00', 'check_out_at' => null,                  'duration' => null,'schedule_done' => false, 'method' => 'qr'],
-        ];
-
-        foreach ($checkins as $checkin) {
-            if ($checkin['user_id']) {
-                Checkin::create($checkin);
+        foreach ($members as $member) {
+            // Generate 15-45 checkins for each member over the last 90 days
+            $numCheckins = rand(15, 45);
+            for ($i = 0; $i < $numCheckins; $i++) {
+                $checkinDate = \Carbon\Carbon::now()->subDays(rand(1, 90))->setTime(rand(6, 18), rand(0, 59), 0);
+                $duration = rand(45, 120);
+                $checkoutDate = (clone $checkinDate)->addMinutes($duration);
+                
+                // 10% chance they forgot to checkout
+                if (rand(1, 10) == 10) {
+                    $checkoutDate = null;
+                    $duration = null;
+                }
+                
+                Checkin::create([
+                    'user_id' => $member->id,
+                    'branch_id' => 1,
+                    'check_in_at' => $checkinDate,
+                    'check_out_at' => $checkoutDate,
+                    'duration' => $duration,
+                    'schedule_done' => rand(0, 1) == 1,
+                    'method' => rand(0, 1) == 1 ? 'qr' : 'face',
+                    'notes' => null,
+                ]);
             }
         }
     }

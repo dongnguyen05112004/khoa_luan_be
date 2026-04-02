@@ -12,33 +12,18 @@ class BusinessReportSeeder extends Seeder
 {
     public function run(): void
     {
-        // Business Reports
-        $reports = [
-            [
-                'id_report'         => 'RPT-2026-01',
-                'date_from_summary' => '2026-01-31',
-                'date_from'         => '2026-01-01',
-                'amount'            => 45000000,
-                'ai_diagnosis'      => 'Doanh thu tháng 1 tăng 12% so với cùng kỳ năm trước. Gói 3 tháng bán chạy nhất.',
-            ],
-            [
-                'id_report'         => 'RPT-2026-02',
-                'date_from_summary' => '2026-02-28',
-                'date_from'         => '2026-02-01',
-                'amount'            => 52000000,
-                'ai_diagnosis'      => 'Doanh thu tháng 2 tăng mạnh 18% nhờ chương trình Valentine. Hội viên mới tăng 25 người.',
-            ],
-            [
-                'id_report'         => 'RPT-2026-03',
-                'date_from_summary' => '2026-03-18',
-                'date_from'         => '2026-03-01',
-                'amount'            => 28000000,
-                'ai_diagnosis'      => 'Doanh thu đầu tháng 3 ổn định, dự báo cả tháng đạt 55 triệu dựa trên xu hướng.',
-            ],
-        ];
-
-        foreach ($reports as $r) {
-            BusinessReport::firstOrCreate(['id_report' => $r['id_report']], $r);
+        for ($i = 0; $i < 4; $i++) {
+            $month = \Carbon\Carbon::now()->subMonths($i);
+            
+            BusinessReport::create([
+                'id_report'         => 'RPT-' . $month->format('Y-m'),
+                'date_from_summary' => $month->copy()->endOfMonth()->toDateString(),
+                'date_from'         => $month->copy()->startOfMonth()->toDateString(),
+                'amount'            => rand(30, 100) * 1000000,
+                'ai_diagnosis'      => 'Báo cáo doanh thu tháng ' . $month->format('m/Y') . '. Nhìn chung tương đối biến động.',
+                'created_at'        => $month->copy()->endOfMonth(),
+                'updated_at'        => $month->copy()->endOfMonth(),
+            ]);
         }
     }
 }

@@ -43,4 +43,5 @@ class Trainer extends Model
     {
         return $this->hasMany(MemberFeedback::class);
     }
+
 }
