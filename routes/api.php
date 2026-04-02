@@ -59,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/users/{id}/subscriptions',   [UserController::class, 'subscriptions']);
     Route::get('/users/{id}/checkins',        [UserController::class, 'checkins']);
     Route::get('/users/{id}/health-metrics',  [UserController::class, 'healthMetrics']);
+    Route::get('/users/{id}/admin-get-user',  [UserController::class, 'adminGetUser']);
 
     // Employee Profiles
     Route::resource('employee-profiles', EmployeeProfileController::class);
