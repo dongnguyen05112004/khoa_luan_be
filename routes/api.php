@@ -55,8 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::resource('roles', RoleController::class);
 
     // Users
-    Route::get('/users/admin-get-user',  [UserController::class, 'adminGetUser'])
-        ->middleware('can:viewAny,' . User::class);
+    Route::get('/users/admin-get-user', [UserController::class, 'adminGetUser']);
     Route::resource('users', UserController::class);
     Route::get('/users/{id}/subscriptions',   [UserController::class, 'subscriptions']);
     Route::get('/users/{id}/checkins',        [UserController::class, 'checkins']);
