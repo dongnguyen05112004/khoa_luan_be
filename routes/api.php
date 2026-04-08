@@ -192,13 +192,15 @@ Route::middleware('auth:sanctum')->group(function () {
     ==========================================================*/
 
     // Equipment (Thiết bị)
-    Route::get('/equipment',          [EquipmentController::class, 'index']);
-    Route::post('/equipment',         [EquipmentController::class, 'store']);
-    Route::get('/equipment/{id}',     [EquipmentController::class, 'show']);
-    Route::put('/equipment/{id}',     [EquipmentController::class, 'update']);
-    Route::delete('/equipment/{id}',  [EquipmentController::class, 'destroy']);
+    Route::get('/equipment',                      [EquipmentController::class, 'index']);
+    Route::post('/equipment',                     [EquipmentController::class, 'store']);
+    Route::get('/equipment/{id}',                 [EquipmentController::class, 'show']);
+    Route::put('/equipment/{id}',                 [EquipmentController::class, 'update']);
+    Route::patch('/equipment/{id}/status',        [EquipmentController::class, 'updateStatus']); // Cập nhật trạng thái
+    Route::delete('/equipment/{id}',              [EquipmentController::class, 'destroy']);
 
     // Equipment Maintenance (Bảo trì thiết bị)
+    Route::get('/equipment-maintenance/due-soon', [EquipmentMaintenanceController::class, 'dueSoon']); // Lịch sắp đến hạn
     Route::get('/equipment-maintenance',          [EquipmentMaintenanceController::class, 'index']);
     Route::post('/equipment-maintenance',         [EquipmentMaintenanceController::class, 'store']);
     Route::get('/equipment-maintenance/{id}',     [EquipmentMaintenanceController::class, 'show']);
