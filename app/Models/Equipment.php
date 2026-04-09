@@ -48,23 +48,6 @@ class Equipment extends Model
     {
         return $this->hasMany(EquipmentMaintenance::class);
     }
-<<<<<<< HEAD
-    // Lấy danh sách máy đang hỏng
-    public function scopeBroken($query)
-    {
-        return $query->where('status', 'broken');
-    }
-
-    // Lấy danh sách máy đang bảo trì
-    public function scopeInMaintenance($query)
-    {
-        return $query->where('status', 'maintenance');
-    }
-    // Tính tổng chi phí bảo trì của thiết bị này từ trước đến nay
-    public function getTotalMaintenanceCostAttribute()
-    {
-        return $this->maintenances()->sum('cost');
-=======
 
     /** Lần bảo trì gần nhất */
     public function latestMaintenance()
@@ -84,6 +67,18 @@ class Equipment extends Model
 
     // ──── Scopes ───────────────────────────────────────────────────
 
+    // Lấy danh sách máy đang hỏng
+    public function scopeBroken($query)
+    {
+        return $query->where('status', 'broken');
+    }
+
+    // Lấy danh sách máy đang bảo trì
+    public function scopeInMaintenance($query)
+    {
+        return $query->where('status', 'maintenance');
+    }
+
     public function scopeOfStatus($query, $status)
     {
         return $query->where('status', $status);
@@ -92,7 +87,12 @@ class Equipment extends Model
     public function scopeOfBranch($query, $branchId)
     {
         return $query->where('branch_id', $branchId);
->>>>>>> trong
+    }
+
+    // Tính tổng chi phí bảo trì của thiết bị này từ trước đến nay
+    public function getTotalMaintenanceCostAttribute()
+    {
+        return $this->maintenances()->sum('cost');
     }
 }
 

@@ -56,20 +56,21 @@ class EquipmentMaintenance extends Model
     {
         return $this->belongsTo(User::class, 'technician_id');
     }
-<<<<<<< HEAD
+
+    // ──── Scopes ───────────────────────────────────────────────────
+
     public function scopeMonthly($query, $month, $year)
     {
         return $query->whereMonth('maintenance_date', $month)
                     ->whereYear('maintenance_date', $year);
     }
+
     public function scopeLatestForEquipment($query, $equipmentId)
     {
         return $query->where('equipment_id', $equipmentId)
                     ->orderBy('maintenance_date', 'desc')
                     ->first();
-=======
-
-    // ──── Scopes ───────────────────────────────────────────────────
+    }
 
     /** Chỉ lấy lịch bảo trì định kỳ */
     public function scopePeriodic($query)
@@ -86,6 +87,5 @@ class EquipmentMaintenance extends Model
                          now()->toDateString(),
                          now()->addDays($days)->toDateString(),
                      ]);
->>>>>>> trong
     }
 }
