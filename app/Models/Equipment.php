@@ -10,9 +10,34 @@ class Equipment extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['equipment_name', 'serial_number', 'branch_id', 'purchase_date', 'status'];
+    /**
+     * Trạng thái thiết bị:
+     *  active      = Đang sử dụng
+     *  maintenance = Đang bảo trì
+     *  broken      = Hỏng / Ngừng sử dụng
+     */
+    const STATUS_ACTIVE      = 'active';
+    const STATUS_MAINTENANCE = 'maintenance';
+    const STATUS_BROKEN      = 'broken';
 
-    protected $casts = ['purchase_date' => 'date'];
+    const STATUSES = [self::STATUS_ACTIVE, self::STATUS_MAINTENANCE, self::STATUS_BROKEN];
+
+    protected $fillable = [
+        'equipment_name',
+        'serial_number',
+        'branch_id',
+        'purchase_date',
+        'status',
+        'location',
+        'type',
+        'brand',
+    ];
+
+    protected $casts = [
+        'purchase_date' => 'date',
+    ];
+
+    // ──── Relations ────────────────────────────────────────────────
 
     public function branch()
     {
@@ -23,6 +48,25 @@ class Equipment extends Model
     {
         return $this->hasMany(EquipmentMaintenance::class);
     }
+
+    /** Lần bảo trì gần nhất */
+    public function latestMaintenance()
+    {
+        return $this->hasOne(EquipmentMaintenance::class)->latestOfMany('maintenance_date');
+    }
+
+    /** Lịch bảo trì sắp tới (is_periodic = true, next_maintenance_date >= hôm nay) */
+    public function upcomingMaintenance()
+    {
+        return $this->hasMany(EquipmentMaintenance::class)
+                    ->where('is_periodic', true)
+                    ->whereNotNull('next_maintenance_date')
+                    ->where('next_maintenance_date', '>=', now()->toDateString())
+                    ->orderBy('next_maintenance_date');
+    }
+
+    // ──── Scopes ───────────────────────────────────────────────────
+
     // Lấy danh sách máy đang hỏng
     public function scopeBroken($query)
     {
@@ -34,9 +78,21 @@ class Equipment extends Model
     {
         return $query->where('status', 'maintenance');
     }
+
+    public function scopeOfStatus($query, $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    public function scopeOfBranch($query, $branchId)
+    {
+        return $query->where('branch_id', $branchId);
+    }
+
     // Tính tổng chi phí bảo trì của thiết bị này từ trước đến nay
     public function getTotalMaintenanceCostAttribute()
     {
         return $this->maintenances()->sum('cost');
     }
 }
+
