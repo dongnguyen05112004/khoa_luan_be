@@ -14,7 +14,7 @@ class ActivityLogSeeder extends Seeder
         $users = User::all();
         if ($users->isEmpty()) return;
 
-        // Định nghĩa bản đồ logic cho các hành động
+        // Định nghĩa bản đồ logic cho các hành động (Bao gồm cả các action FE yêu cầu)
         $actionMap = [
             'USER_LOGIN'      => ['severity' => 'info', 'type' => null],
             'VIEW_PROFILE'    => ['severity' => 'info', 'type' => null],
@@ -27,32 +27,52 @@ class ActivityLogSeeder extends Seeder
             'UPDATE_MEMBER'   => ['severity' => 'warning', 'type' => 'App\Models\User'],
             'CREATE_PLAN'     => ['severity' => 'info', 'type' => 'App\Models\MembershipPlan'],
             'DELETE_CAMPAIGN' => ['severity' => 'critical', 'type' => 'App\Models\Promotion'],
-            'CONFIG_SYSTEM'   => ['severity' => 'critical', 'type' => 'App\Models\SystemSetting'],
+            'CONFIG_SYSTEM'   => ['severity' => 'warning', 'type' => 'App\Models\SystemSetting'],
+            'CONFIG_API'      => ['severity' => 'critical', 'type' => 'App\Models\SystemSetting'],
             'AUTO_BACKUP'     => ['severity' => 'info', 'type' => 'Database'],
         ];
 
         $actionKeys = array_keys($actionMap);
+        
+        $totalRecords = 10000;
+        $batchSize = 1000;
+        $batchData = [];
 
-        for ($i = 0; $i < 1000; $i++) {
+        for ($i = 0; $i < $totalRecords; $i++) {
             $user = $users->random();
             $action = collect($actionKeys)->random();
             $logic = $actionMap[$action];
 
-            // Dàn đều dữ liệu trong 90 ngày qua
+            // Dàn đều dữ liệu trong vòng 90 ngày qua (3 tháng)
             $date = Carbon::now()->subDays(rand(1, 90))->setTime(rand(6, 22), rand(0, 59), rand(0, 59));
 
-            ActivityLog::create([
+            // Các giá trị thay đổi ngẫu nhiên
+            $oldVal = $logic['severity'] === 'warning' ? json_encode(['status' => 'old_state']) : null;
+            $newVal = json_encode(['details' => $action . ' executed successfully', 'status' => 'new_state']);
+
+            $batchData[] = [
                 'user_id'     => $user->id,
                 'action'      => $action,
-                'severity'    => $logic['severity'], // Cột mới
-                'target_type' => $logic['type'],     // Cột mới
-                'target_id'   => $logic['type'] ? rand(1, 50) : null, // Cột mới (sinh ID ngẫu nhiên từ 1-50)
+                'severity'    => $logic['severity'],
+                'target_type' => $logic['type'],
+                'target_id'   => $logic['type'] ? rand(1, 50) : null,
                 'ip_address'  => rand(192, 200) . '.168.1.' . rand(2, 255),
-                'old_values'  => null,
-                'new_values'  => json_encode(['details' => $action . ' executed successfully']),
-                'created_at'  => $date,
-                'updated_at'  => $date,
-            ]);
+                'old_values'  => $oldVal,
+                'new_values'  => $newVal,
+                'created_at'  => $date->format('Y-m-d H:i:s'),
+                'updated_at'  => $date->format('Y-m-d H:i:s'),
+            ];
+
+            // Nếu mảng đủ lớn (theo batchSize), insert một lượt để tránh nặng bộ nhớ và chậm DB
+            if (count($batchData) >= $batchSize) {
+                ActivityLog::insert($batchData);
+                $batchData = [];
+            }
+        }
+
+        // Insert phần dư còn lại
+        if (!empty($batchData)) {
+            ActivityLog::insert($batchData);
         }
     }
 }
