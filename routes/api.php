@@ -26,6 +26,8 @@ use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AiRecommendationController;
 use App\Http\Controllers\Api\BusinessReportController;
 use App\Http\Controllers\Api\SystemSettingController;
+use App\Http\Controllers\Api\MemberController;
+use App\Http\Controllers\Api\ContractController;
 use App\Models\User;
 /*
 |--------------------------------------------------------------------------
@@ -77,13 +79,32 @@ Route::middleware('auth:sanctum')->group(function () {
     | 3. QUẢN LÝ HỘI VIÊN (Membership)
     ==========================================================*/
 
+    // ---- MEMBER MANAGEMENT (Giao diện Quản lý hội viên) ----
+    Route::get('/members/stats',                  [MemberController::class, 'stats']);          // Thống kê tổng quan
+    Route::get('/members/search',                 [MemberController::class, 'search']);         // Tìm kiếm nhanh cho dropdown
+    Route::get('/members/{id}/checkins',          [MemberController::class, 'checkins']);       // Lịch sử check-in
+    Route::get('/members/{id}/subscriptions',     [MemberController::class, 'subscriptions']);  // Lịch sử gói tập
+    Route::patch('/members/{id}/status',          [MemberController::class, 'updateStatus']);   // Đổi trạng thái
+    Route::apiResource('members', MemberController::class);                                     // CRUD hội viên
+
     // Membership Plans (Gói tập)
+    Route::get('/membership-plans/active', [MembershipPlanController::class, 'activeOnly']); // Gói đang active
     Route::resource('membership-plans', MembershipPlanController::class);
 
     // Member Subscriptions (Đăng ký gói tập)
     Route::resource('member-subscriptions', MemberSubscriptionController::class);
 
+    /*==========================================================
+    | 3b. QUẢN LÝ HỢP ĐỒNG & GIA HẠN
+    ==========================================================*/
+    Route::get('/contracts/stats',              [ContractController::class, 'stats']);          // Thống kê hợp đồng
+    Route::get('/contracts/member/{userId}',    [ContractController::class, 'memberContracts']); // HĐ hiện tại của hội viên
+    Route::post('/contracts/{id}/renew',        [ContractController::class, 'renew']);          // Gia hạn hợp đồng
+    Route::post('/contracts/{id}/cancel',       [ContractController::class, 'cancel']);         // Hủy hợp đồng
+    Route::apiResource('contracts', ContractController::class);                                 // CRUD hợp đồng
+
     // Promotions (Khuyến mãi)
+    Route::get('/promotions/active', [PromotionController::class, 'activeOnly']); // Khuyến mãi còn hiệu lực
     Route::resource('promotions', PromotionController::class);
 
     /*==========================================================

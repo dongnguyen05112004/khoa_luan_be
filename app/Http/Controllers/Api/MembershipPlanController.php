@@ -14,6 +14,20 @@ class MembershipPlanController extends Controller
         return response()->json(MembershipPlan::withCount('subscriptions')->get());
     }
 
+    /**
+     * GET /api/membership-plans/active
+     * Chỉ trả về các gói tập đang active — dùng cho dropdown form tạo hợp đồng / hội viên mới.
+     * Response: [{ id, plan_name, duration_days, price, description }]
+     */
+    public function activeOnly()
+    {
+        $plans = MembershipPlan::where('status', 'active')
+            ->orderBy('price')
+            ->get(['id', 'plan_name', 'duration_days', 'price', 'description']);
+
+        return response()->json($plans);
+    }
+
     /** POST /api/membership-plans */
     public function store(Request $request)
     {
