@@ -20,6 +20,9 @@ class SystemSettingSeeder extends Seeder
             ['setting_key' => 'ai_recommendation_interval',    'setting_value' => '7',     'setting_group' => 'ai',           'description' => 'Số ngày giữa các lần gợi ý AI'],
             ['setting_key' => 'currency',                      'setting_value' => 'VND',   'setting_group' => 'payment',      'description' => 'Đơn vị tiền tệ'],
             ['setting_key' => 'payment_methods',               'setting_value' => 'cash,transfer,momo,vnpay', 'setting_group' => 'payment', 'description' => 'Phương thức thanh toán hỗ trợ'],
+            ['setting_key' => 'language',                      'setting_value' => 'vi',    'setting_group' => 'system',       'description' => 'Ngôn ngữ hiển thị hệ thống'],
+            ['setting_key' => 'auto_logout_time',              'setting_value' => '30',    'setting_group' => 'system',       'description' => 'Thời gian hệ thống tự động đăng xuất (phút)'],
+            ['setting_key' => 'date_format',                   'setting_value' => 'd/m/Y', 'setting_group' => 'system',       'description' => 'Định dạng hiển thị ngày tháng'],
         ];
 
         foreach ($settings as $s) {

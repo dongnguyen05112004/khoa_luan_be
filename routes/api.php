@@ -173,5 +173,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::resource('activity-logs', ActivityLogController::class, ['only' => ['index', 'store', 'show', 'destroy']]);
 
     // System Settings
+    Route::post('system-settings/bulk-update', [SystemSettingController::class, 'bulkUpdate']);
     Route::resource('system-settings', SystemSettingController::class);
 });
