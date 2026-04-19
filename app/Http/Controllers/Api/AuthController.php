@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,19 +18,29 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|string|email|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-            'phone'    => 'nullable|string|max:20',
-            'gender'   => 'nullable|in:male,female,other',
+            'full_name' => 'required|string|max:150',
+            'email'     => 'required|string|email|unique:users',
+            'password'  => 'required|string|min:8|confirmed',
+            'phone'     => 'nullable|string|max:20',
+            'gender'    => 'nullable|in:male,female,other',
         ]);
+
+        // Tự động gán role "member"
+        $memberRole = Role::where('role_name', 'member')->first();
+        if ($memberRole) {
+            $data['role_id'] = $memberRole->id;
+        }
+
+        // Tự động sinh name = "Hội viên X" (X = số thứ tự member tiếp theo)
+        $memberCount  = User::where('role_id', $memberRole?->id)->count();
+        $data['name'] = 'Hội Viên ' . ($memberCount + 1);
 
         $data['password'] = Hash::make($data['password']);
         $user = User::create($data);
 
         return response()->json([
             'message' => 'Đăng ký thành công',
-            'user'    => $user,
+            'user'    => $user->load('role'),
             'token'   => $user->createToken('api-token')->plainTextToken,
         ], 201);
     }

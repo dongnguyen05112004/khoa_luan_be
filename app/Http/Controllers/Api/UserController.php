@@ -32,22 +32,72 @@ class UserController extends Controller
     /** POST /api/users */
     public function store(Request $request)
     {
+        // ===== PHÂN QUYỀN THEO ROLE NGƯỜI GỌI =====
+        $caller     = $request->user()->load('role');
+        $callerRole = strtolower($caller->role?->role_name ?? '');
+
+        // Lấy role_name của role sẽ được gán cho user mới
+        $targetRoleId   = $request->input('role_id');
+        $targetRoleName = null;
+
+        if ($targetRoleId) {
+            $targetRole     = \App\Models\Role::find($targetRoleId);
+            $targetRoleName = $targetRole ? strtolower($targetRole->role_name) : null;
+        }
+
+        // --- Admin: được tạo mọi role ---
+        if ($callerRole === 'admin') {
+            // Không giới hạn
+        }
+        // --- Manager: không được tạo admin ---
+        elseif ($callerRole === 'manager') {
+            if ($targetRoleName === 'admin') {
+                return response()->json([
+                    'message' => 'Bạn không có quyền tạo tài khoản Admin.',
+                ], 403);
+            }
+        }
+        // --- Staff (Lễ tân): chỉ được tạo member ---
+        elseif ($callerRole === 'staff') {
+            if ($targetRoleName && $targetRoleName !== 'member') {
+                return response()->json([
+                    'message' => 'Lễ tân chỉ được phép tạo tài khoản Hội viên.',
+                ], 403);
+            }
+            // Nếu không truyền role_id, tự động gán member
+            if (!$targetRoleId) {
+                $memberRole = \App\Models\Role::where('role_name', 'member')->first();
+                if ($memberRole) {
+                    $request->merge(['role_id' => $memberRole->id]);
+                }
+            }
+        }
+        // --- Các role khác: không có quyền tạo tài khoản nội bộ ---
+        else {
+            return response()->json([
+                'message' => 'Bạn không có quyền tạo tài khoản.',
+            ], 403);
+        }
+
+        // ===== VALIDATE & TẠO USER =====
         $data = $request->validate([
-            'name'      => 'required|string|max:255',
-            'email'     => 'required|email|unique:users',
-            'password'  => 'required|string|min:8',
-            'role_id'   => 'nullable|exists:roles,id',
-            'branch_id' => 'nullable|exists:branches,id',
-            'full_name' => 'nullable|string|max:150',
-            'phone'     => 'nullable|string|max:20',
-            'gender'    => 'nullable|in:male,female,other',
-            'avatar'    => 'nullable|string|max:255',
+            'name'        => 'required|string|max:255',
+            'email'       => 'required|email|unique:users',
+            'password'    => 'required|string|min:8',
+            'role_id'     => 'nullable|exists:roles,id',
+            'branch_id'   => 'nullable|exists:branches,id',
+            'full_name'   => 'nullable|string|max:150',
+            'phone'       => 'nullable|string|max:20',
+            'gender'      => 'nullable|in:male,female,other',
+            'avatar'      => 'nullable|string|max:255',
             'card_number' => 'nullable|string|max:50',
-            'e_number'  => 'nullable|string|max:50',
-            'state'     => 'nullable|in:active,inactive,banned',
+            'e_number'    => 'nullable|string|max:50',
+            'state'       => 'nullable|in:active,inactive,banned',
         ]);
+
         $data['password'] = Hash::make($data['password']);
         $user = User::create($data);
+
         return new UserResource($user->load(['role', 'branch']));
     }
 
