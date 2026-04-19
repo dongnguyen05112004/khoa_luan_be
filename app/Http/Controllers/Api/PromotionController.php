@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Promotion;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class PromotionController extends Controller
@@ -12,6 +13,25 @@ class PromotionController extends Controller
     public function index()
     {
         return response()->json(Promotion::all());
+    }
+
+    /**
+     * GET /api/promotions/active
+     * Chỉ trả về các khuyn mãi còn hiệu lực (thời gian + nạp dùng + is_active)
+     * Dùng cho dropdown form tạo hợp đồng / hội viên mới.
+     * Response: [{ id, title, code, discount, end_date }]
+     */
+    public function activeOnly()
+    {
+        $today = Carbon::today();
+        $promotions = Promotion::where('is_active', true)
+            ->where('start_date', '<=', $today)
+            ->where('end_date', '>=', $today)
+            ->whereColumn('current_usage', '<', 'usage_limit')
+            ->orderBy('discount', 'desc')
+            ->get(['id', 'title', 'code', 'discount', 'end_date']);
+
+        return response()->json($promotions);
     }
 
     /** POST /api/promotions */

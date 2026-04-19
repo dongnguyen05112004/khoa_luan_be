@@ -11,7 +11,8 @@ class MemberSubscription extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'plan_id', 'promotion_id', 'start_date', 'end_date', 'price', 'status',
+        'user_id', 'plan_id', 'promotion_id', 'start_date', 'end_date',
+        'price', 'status', 'cancel_reason',
     ];
 
     protected $casts = [
