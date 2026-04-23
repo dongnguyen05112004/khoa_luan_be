@@ -49,6 +49,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me',      [AuthController::class, 'me']);
     Route::put('/me',      [AuthController::class, 'updateMe']);
 
+    // API riêng cho Hồ sơ cá nhân của khách hàng (hội viên)
+    Route::get('/customer/profile', [\App\Http\Controllers\Api\CustomerProfileController::class, 'show']);
+    Route::put('/customer/profile', [\App\Http\Controllers\Api\CustomerProfileController::class, 'update']);
+    Route::delete('/customer/profile', [\App\Http\Controllers\Api\CustomerProfileController::class, 'destroy']);
+
     /*==========================================================
     | 1. QUẢN LÝ TÀI KHOẢN & PHÂN QUYỀN
     ==========================================================*/
@@ -184,6 +189,8 @@ Route::middleware('auth:sanctum')->group(function () {
     /*==========================================================
     | 11 & 12. GỢI Ý AI & CÁ NHÂN HÓA
     ==========================================================*/
+    Route::post('ai-recommendations/generate', [AiRecommendationController::class, 'generateForUser']);
+    Route::post('admin/churn-prediction', [AiRecommendationController::class, 'predictChurn']); // <--- ADDED CHURN PREDICTION
     Route::resource('ai-recommendations', AiRecommendationController::class);
 
     /*==========================================================
