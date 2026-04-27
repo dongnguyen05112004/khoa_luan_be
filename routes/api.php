@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\BusinessReportController;
 use App\Http\Controllers\Api\SystemSettingController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\ContractController;
+use App\Http\Controllers\Api\ServicePurchaseController;
 use App\Models\User;
 /*
 |--------------------------------------------------------------------------
@@ -191,6 +192,7 @@ Route::middleware('auth:sanctum')->group(function () {
     ==========================================================*/
     Route::post('ai-recommendations/generate', [AiRecommendationController::class, 'generateForUser']);
     Route::post('admin/churn-prediction', [AiRecommendationController::class, 'predictChurn']); // <--- ADDED CHURN PREDICTION
+    Route::post('admin/manager-report', [AiRecommendationController::class, 'generateManagerReport']); // Báo cáo cho Quản lý
     Route::resource('ai-recommendations', AiRecommendationController::class);
 
     /*==========================================================
@@ -203,4 +205,25 @@ Route::middleware('auth:sanctum')->group(function () {
     // System Settings
     Route::post('system-settings/bulk-update', [SystemSettingController::class, 'bulkUpdate']);
     Route::resource('system-settings', SystemSettingController::class);
+
+    /*==========================================================
+    | MUA DỊCH VỤ (dành cho hội viên)
+    ==========================================================*/
+
+    // Danh sách dịch vụ (public trong auth – hội viên xem trước khi mua)
+    Route::get('/services/membership-plans', [ServicePurchaseController::class, 'listMembershipPlans']); // Danh sách gói tập
+    Route::get('/services/trainers',         [ServicePurchaseController::class, 'listTrainers']);        // Danh sách HLV PT
+
+    // Gói đang hoạt động và lịch sử của hội viên đang đăng nhập
+    Route::get('/services/my-active',        [ServicePurchaseController::class, 'myActive']);      // Gói đang active
+    Route::get('/services/my-history',       [ServicePurchaseController::class, 'myHistory']);     // Lịch sử gói tập
+    Route::get('/services/my-pt-contracts',  [ServicePurchaseController::class, 'myPtContracts']); // Lịch sử HĐ PT
+
+    // Mua mới
+    Route::post('/services/purchase-plan',   [ServicePurchaseController::class, 'purchasePlan']); // Mua gói tập
+    Route::post('/services/purchase-pt',     [ServicePurchaseController::class, 'purchasePt']);   // Mua gói PT
+
+    // Gia hạn & Hủy gói tập
+    Route::post('/services/renew-plan/{id}', [ServicePurchaseController::class, 'renewPlan']);   // Gia hạn gói tập
+    Route::post('/services/cancel-plan/{id}',[ServicePurchaseController::class, 'cancelPlan']);  // Hủy gói (pending)
 });
