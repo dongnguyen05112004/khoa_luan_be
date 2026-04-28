@@ -149,8 +149,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*==========================================================
     | 7. THANH TOÁN
+    |    Thu_tien.vue  → GET /payments, GET /payments/stats
+    |    XuLyThanhToan → POST /payments, PATCH /payments/{id}/confirm
+    |                    POST /payments/validate-promo
+    |                    GET  /payments/invoice/{id}
     ==========================================================*/
-    Route::resource('payments', PaymentController::class);
+    // Endpoint đặc biệt (đặt TRƯỚC resource để tránh bị bắt nhầm bởi {id})
+    Route::get('/payments/stats',             [PaymentController::class, 'stats']);
+    Route::get('/payments/summary',           [PaymentController::class, 'summary']);
+    Route::post('/payments/validate-promo',   [PaymentController::class, 'validatePromo']);
+    Route::get('/payments/invoice/{id}',      [PaymentController::class, 'invoice']);
+    Route::patch('/payments/{id}/confirm',    [PaymentController::class, 'confirm']);
+    Route::patch('/payments/{id}/refund',     [PaymentController::class, 'refund']);
+    // CRUD chuẩn
+    Route::apiResource('payments', PaymentController::class);
 
     /*==========================================================
     | 8. QUẢN LÝ THIẾT BỊ
