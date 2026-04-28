@@ -64,10 +64,23 @@ class AuthController extends Controller
         $user = Auth::user();
         $user->load(['role', 'branch']);
 
+        // Bản đồ role → đường dẫn UI tương ứng
+        $redirectMap = [
+            'admin'   => '/admin/quanlynguoidung',
+            'manager' => '/quanly/baocao',
+            'staff'   => '/nhanvien',
+            'trainer' => '/PT',
+            'member'  => '/khachhang/ho_so_ca_nhan',
+        ];
+
+        $roleName    = strtolower($user->role?->role_name ?? '');
+        $redirectUrl = $redirectMap[$roleName] ?? '/dashboard';
+
         return response()->json([
-            'message' => 'Đăng nhập thành công',
-            'user'    => $user,
-            'token'   => $user->createToken('api-token')->plainTextToken,
+            'message'      => 'Đăng nhập thành công',
+            'user'         => $user,
+            'token'        => $user->createToken('api-token')->plainTextToken,
+            'redirect_url' => $redirectUrl,
         ]);
     }
 

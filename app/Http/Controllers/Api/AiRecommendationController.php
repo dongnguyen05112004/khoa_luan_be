@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiRecommendation;
+use App\Services\GroqService;
+use App\Services\GeminiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class AiRecommendationController extends Controller
 {
@@ -68,7 +71,7 @@ class AiRecommendationController extends Controller
      * Tự động sinh Phản hồi AI dựa trên dữ liệu sức khỏe của người dùng hiện tại 
      * POST /api/ai-recommendations/generate 
      */
-    public function generateForUser(Request $request, \App\Services\GeminiService $geminiService)
+    public function generateForUser(Request $request, GroqService $groqService, GeminiService $geminiService)
     {
         $user = $request->user()->load(['memberProfile', 'healthMetrics' => function($q) {
             $q->orderBy('record_date', 'desc')->take(2);
@@ -93,8 +96,7 @@ class AiRecommendationController extends Controller
         $cacheKey = "ai_health_rec_user_{$user->id}_metric_{$latestMetricId}";
 
         try {
-            return Cache::remember($cacheKey, now()->addHour(), function() use ($user, $geminiService, $metricsText, $goalText) {
-                // Prompt gửi cho Gemini
+            return Cache::remember($cacheKey, now()->addHour(), function() use ($user, $groqService, $geminiService, $metricsText, $goalText) {
                 $prompt = "Bạn là một huấn luyện viên AI chuyên nghiệp. Dựa vào thông tin của khách hàng sau đây, hãy đưa ra 1 chẩn đoán ngắn gọn (diagnosis), 1 tiêu đề (title) cho lời khuyên, và 3 gạch đầu dòng các gợi ý (suggestions) để cải thiện sức khỏe/thể hình. 
 
 LƯU Ý QUAN TRỌNG: Mọi nội dung trả về (title, ai_diagnosis, ai_suggestions) BẮT BUỘC PHẢI ĐƯỢC VIẾT HOÀN TOÀN BẰNG TIẾNG VIỆT.
@@ -111,9 +113,7 @@ Thông tin khách hàng:
 - Mục tiêu/Ghi chú sức khỏe: {$goalText}
 - Chỉ số sức khỏe mới nhất: {$metricsText}";
 
-                $responseJson = $geminiService->askAI($prompt);
-                
-                // Xóa bỏ markdown code block nếu Gemini có trả về
+                $responseJson = $this->callAI($groqService, $geminiService, $prompt);
                 $responseJson = str_replace(['```json', '```'], '', $responseJson);
                 $parsed = json_decode(trim($responseJson), true);
 
@@ -145,7 +145,7 @@ Thông tin khách hàng:
      * Dành cho Admin/Manager để dự báo tỷ lệ rời bỏ
      * POST /api/admin/churn-prediction
      */
-    public function predictChurn(Request $request, \App\Services\GeminiService $geminiService)
+    public function predictChurn(Request $request, GroqService $groqService, GeminiService $geminiService)
     {
         // 1. Lấy tất cả user có role là 'member' kèm theo dữ liệu liên quan
         $members = \App\Models\User::whereHas('role', function($q) {
@@ -182,7 +182,7 @@ Thông tin khách hàng:
         $cacheKey = 'ai_churn_prediction_latest';
 
         try {
-            return Cache::remember($cacheKey, now()->addHour(), function() use ($geminiService, $jsonInput) {
+            return Cache::remember($cacheKey, now()->addHour(), function() use ($groqService, $geminiService, $jsonInput) {
                 $prompt = "Bạn là chuyên gia phân tích dữ liệu khách hàng (Churn Prediction) cho phòng Gym.
 Dưới đây là dữ liệu ẩn danh của các hội viên:
 $jsonInput
@@ -203,7 +203,7 @@ Trả về ĐÚNG định dạng MẢNG JSON sau (không kèm markdown):
   }
 ]";
 
-                $responseJson = $geminiService->askAI($prompt);
+                $responseJson = $this->callAI($groqService, $geminiService, $prompt);
                 $responseJson = str_replace(['```json', '```'], '', $responseJson);
                 $parsedArray = json_decode(trim($responseJson), true);
 
@@ -239,13 +239,13 @@ Trả về ĐÚNG định dạng MẢNG JSON sau (không kèm markdown):
      * Báo cáo tổng quan hoạt động phòng gym (Dành cho Quản lý)
      * POST /api/admin/manager-report
      */
-    public function generateManagerReport(Request $request, \App\Services\GeminiService $geminiService)
+    public function generateManagerReport(Request $request, GroqService $groqService, GeminiService $geminiService)
     {
         // Sử dụng Cache để tránh gọi AI quá nhiều lần trong thời gian ngắn (15 phút)
         $cacheKey = 'ai_manager_report_latest';
         
         try {
-            return Cache::remember($cacheKey, now()->addMinutes(15), function() use ($request, $geminiService) {
+            return Cache::remember($cacheKey, now()->addMinutes(15), function() use ($request, $groqService, $geminiService) {
                 // 1. Thu thập dữ liệu doanh thu
                 $currentMonthRevenue = \App\Models\Payment::where('status', 'paid')
                     ->whereMonth('payment_date', now()->month)
@@ -285,7 +285,7 @@ Trả về ĐÚNG định dạng MẢNG JSON sau (không kèm markdown):
                 $prompt = "Bạn là chuyên gia cố vấn chiến lược phòng Gym. Phân tích dữ liệu sau và trả về JSON: " . json_encode($businessData) . 
                           "\nYêu cầu JSON: { \"title\": \"...\", \"ai_diagnosis\": \"...\", \"ai_suggestions\": \"- Gợi ý 1\\n- Gợi ý 2\" } (Tiếng Việt)";
 
-                $responseJson = $geminiService->askAI($prompt);
+                $responseJson = $this->callAI($groqService, $geminiService, $prompt);
                 $responseJson = str_replace(['```json', '```'], '', $responseJson);
                 $parsed = json_decode(trim($responseJson), true);
 
@@ -307,40 +307,53 @@ Trả về ĐÚNG định dạng MẢNG JSON sau (không kèm markdown):
             });
 
         } catch (\Exception $e) {
-            // Nếu lỗi do AI quá tải, xóa cache để lần sau có thể thử lại ngay
             Cache::forget($cacheKey);
             return $this->handleAiError($e, 'Manager Report');
+        }
+    }
+
+    /**
+     * Gọi Groq trước, nếu lỗi thì fallback sang Gemini.
+     */
+    private function callAI(GroqService $groqService, GeminiService $geminiService, string $prompt): string
+    {
+        try {
+            Log::info('Calling Groq AI (' . env('GROQ_MODEL') . ')...');
+            return $groqService->askAI($prompt);
+        } catch (\Exception $e) {
+            Log::warning('Groq AI failed, falling back to Gemini: ' . $e->getMessage());
+            return $geminiService->askAI($prompt);
         }
     }
 
     /** Helper xử lý lỗi AI tập trung */
     private function handleAiError(\Exception $e, $context = '')
     {
-        \Illuminate\Support\Facades\Log::error("Gemini API Error ($context): " . $e->getMessage() . "\n" . $e->getTraceAsString());
+        Log::error("AI Error ($context): " . $e->getMessage() . "\n" . $e->getTraceAsString());
 
         $errorMessage = $e->getMessage();
+        $friendlyMessage = 'Đã xảy ra lỗi khi gọi AI. Vui lòng thử lại.';
         $status = 500;
-        if (str_contains($errorMessage, 'high demand') || str_contains($errorMessage, 'quá tải') || str_contains($errorMessage, '429')) {
-            $friendlyMessage = 'Máy chủ AI của Google đang bị quá tải. Vui lòng đợi vài giây và thử lại.';
+
+        if (str_contains($errorMessage, '429') || str_contains($errorMessage, 'rate limit') || str_contains($errorMessage, 'quá tải') || str_contains($errorMessage, 'high demand')) {
+            $friendlyMessage = 'Máy chủ AI đang bị quá tải. Vui lòng đợi vài giây và thử lại.';
             $status = 429;
-        } else if (str_contains($errorMessage, 'quota')) {
-            // Cố gắng bóc tách số giây cần chờ từ lỗi của Google
+        } elseif (str_contains($errorMessage, 'quota')) {
             preg_match('/retry in ([\d\.]+)s/', $errorMessage, $matches);
             $waitTime = isset($matches[1]) ? ceil((float)$matches[1]) : null;
-            
-            if ($waitTime) {
-                $friendlyMessage = "Bạn đã thực hiện quá nhiều yêu cầu. Vui lòng đợi {$waitTime} giây nữa để tiếp tục.";
-            } else {
-                $friendlyMessage = 'Bạn đã hết hạn mức sử dụng miễn phí trong phút này. Vui lòng đợi một lát.';
-            }
+            $friendlyMessage = $waitTime
+                ? "Quá giới hạn yêu cầu. Vui lòng đợi {$waitTime} giây nữa."
+                : 'Bạn đã hết hạn mức sử dụng miễn phí. Vui lòng đợi một lát.';
             $status = 429;
-        } else if (str_contains($errorMessage, 'not found')) {
-            $friendlyMessage = 'Model AI hiện tại không được hỗ trợ. Vui lòng kiểm tra GEMINI_MODEL trong .env.';
+        } elseif (str_contains($errorMessage, 'not found') || str_contains($errorMessage, 'model')) {
+            $friendlyMessage = 'Model AI không được hỗ trợ. Vui lòng kiểm tra GROQ_MODEL hoặc GEMINI_MODEL trong .env.';
+        } elseif (str_contains($errorMessage, 'API_KEY') || str_contains($errorMessage, 'chưa được cấu hình')) {
+            $friendlyMessage = 'API Key AI chưa được cấu hình. Vui lòng kiểm tra GROQ_API_KEY trong .env.';
         }
 
         return response()->json([
             'message' => $friendlyMessage,
-            'error' => $errorMessage,
+            'error'   => $errorMessage,
             'context' => $context
         ], $status);
     }
