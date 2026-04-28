@@ -203,6 +203,16 @@ Route::middleware('auth:sanctum')->group(function () {
     | 11 & 12. GỢI Ý AI & CÁ NHÂN HÓA
     ==========================================================*/
     Route::post('ai-recommendations/generate', [AiRecommendationController::class, 'generateForUser']);
+    
+    // AI cho Quản lý
+    Route::post('manager/overview', [AiRecommendationController::class, 'managerOverview']);
+    Route::post('manager/retention-analysis', [AiRecommendationController::class, 'retentionAnalysis']);
+    Route::post('manager/plan-effectiveness', [AiRecommendationController::class, 'planEffectiveness']);
+    Route::post('manager/promotion-effectiveness', [AiRecommendationController::class, 'promotionEffectiveness']);
+    Route::post('manager/feedback-analysis', [AiRecommendationController::class, 'feedbackAnalysis']);
+    Route::post('manager/general-report', [AiRecommendationController::class, 'generalReport']);
+    Route::post('manager/health-churn-report', [AiRecommendationController::class, 'healthChurnReport']);
+
     Route::post('admin/churn-prediction', [AiRecommendationController::class, 'predictChurn']); // <--- ADDED CHURN PREDICTION
     Route::post('admin/manager-report', [AiRecommendationController::class, 'generateManagerReport']); // Báo cáo cho Quản lý
     Route::resource('ai-recommendations', AiRecommendationController::class);
