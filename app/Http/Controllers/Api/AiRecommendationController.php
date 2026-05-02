@@ -7,25 +7,31 @@ use App\Models\AiRecommendation;
 use App\Services\GroqService;
 use App\Services\GeminiService;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class AiRecommendationController extends Controller
 {
+    // =========================================================================
+    // CRUD cơ bản
+    // =========================================================================
+
     /** GET /api/ai-recommendations */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         return response()->json(
             AiRecommendation::with('user')
                 ->when($request->user_id, fn($q) => $q->where('user_id', $request->user_id))
-                ->when($request->type, fn($q) => $q->where('recommendation_type', $request->type))
-                ->latest()->paginate($request->per_page ?? 20)
+                ->when($request->type,    fn($q) => $q->where('recommendation_type', $request->type))
+                ->latest()
+                ->paginate($request->per_page ?? 20)
         );
     }
 
     /** POST /api/ai-recommendations */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
             'user_id'             => 'required|exists:users,id',
@@ -37,19 +43,20 @@ class AiRecommendationController extends Controller
             'created_at_custom'   => 'nullable|date',
             'ai_next'             => 'nullable|date',
         ]);
+
         return response()->json(AiRecommendation::create($data)->load('user'), 201);
     }
 
     /** GET /api/ai-recommendations/{id} */
-    public function show($id)
+    public function show($id): JsonResponse
     {
         return response()->json(AiRecommendation::with('user')->findOrFail($id));
     }
 
     /** PUT /api/ai-recommendations/{id} */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id): JsonResponse
     {
-        $rec = AiRecommendation::findOrFail($id);
+        $rec  = AiRecommendation::findOrFail($id);
         $data = $request->validate([
             'recommendation_type' => 'nullable|string|max:100',
             'ai_diagnosis'        => 'nullable|string',
@@ -57,72 +64,73 @@ class AiRecommendationController extends Controller
             'ai_suggestions'      => 'nullable|string',
             'ai_next'             => 'nullable|date',
         ]);
+
         $rec->update($data);
         return response()->json($rec);
     }
 
     /** DELETE /api/ai-recommendations/{id} */
-    public function destroy($id)
+    public function destroy($id): JsonResponse
     {
         AiRecommendation::findOrFail($id)->delete();
         return response()->json(['message' => 'Đã xóa gợi ý AI']);
     }
 
-    /** 
-     * Tự động sinh Phản hồi AI dựa trên dữ liệu sức khỏe của người dùng hiện tại 
-     * POST /api/ai-recommendations/generate 
+    // =========================================================================
+    // AI GENERATION — Dành cho Member
+    // =========================================================================
+
+    /**
+     * Tự động sinh gợi ý sức khỏe dựa trên dữ liệu của người dùng hiện tại.
+     * POST /api/ai-recommendations/generate
      */
-    public function generateForUser(Request $request, GroqService $groqService, GeminiService $geminiService)
+    public function generateForUser(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
-        $user = $request->user()->load(['memberProfile', 'healthMetrics' => function($q) {
-            $q->orderBy('record_date', 'desc')->take(2);
-        }]);
+        $user = $request->user()->load([
+            'memberProfile',
+            'healthMetrics' => fn($q) => $q->orderBy('record_date', 'desc')->take(2),
+        ]);
 
-        $metricsText = "Không có dữ liệu sức khỏe nào.";
-        if ($user->healthMetrics->count() > 0) {
-            $latest = $user->healthMetrics->first();
-            $metricsText = sprintf(
-                "Cân nặng: %s kg, Chiều cao: %s cm, Mỡ: %s%%, Cơ: %s%%, BMI: %s",
-                $latest->weight ?? 'N/A',
-                $latest->height ?? 'N/A',
+        $latest      = $user->healthMetrics->first();
+        $metricsText = $latest
+            ? sprintf(
+                'Cân nặng: %s kg, Chiều cao: %s cm, Mỡ: %s%%, Cơ: %s%% kg, BMI: %s',
+                $latest->weight             ?? 'N/A',
+                $latest->height             ?? 'N/A',
                 $latest->body_fat_percentage ?? 'N/A',
-                $latest->muscle_mass_kg ?? 'N/A',
-                $latest->bmi ?? 'N/A'
-            );
-        }
+                $latest->muscle_mass_kg     ?? 'N/A',
+                $latest->bmi               ?? 'N/A'
+            )
+            : 'Không có dữ liệu sức khỏe.';
 
-        $goalText = $user->memberProfile->health_notes ?? 'Không có thông tin mục tiêu.';
-
-        $latestMetricId = $user->healthMetrics->first() ? $user->healthMetrics->first()->id : 'none';
-        $cacheKey = "ai_health_rec_user_{$user->id}_metric_{$latestMetricId}";
+        $goalText       = $user->memberProfile->health_notes ?? 'Không có thông tin mục tiêu.';
+        $latestMetricId = $latest?->id ?? 'none';
+        $cacheKey       = "ai_health_rec_user_{$user->id}_metric_{$latestMetricId}";
 
         try {
-            return Cache::remember($cacheKey, now()->addHour(), function() use ($user, $groqService, $geminiService, $metricsText, $goalText) {
-                $prompt = "Bạn là một huấn luyện viên AI chuyên nghiệp. Dựa vào thông tin của khách hàng sau đây, hãy đưa ra 1 chẩn đoán ngắn gọn (diagnosis), 1 tiêu đề (title) cho lời khuyên, và 3 gạch đầu dòng các gợi ý (suggestions) để cải thiện sức khỏe/thể hình. 
+            // Cache chỉ lưu array, KHÔNG lưu Eloquent model hay Response object
+            $cachedData = Cache::remember($cacheKey, now()->addHour(), function () use ($user, $groq, $gemini, $metricsText, $goalText) {
+                $prompt = <<<PROMPT
+Bạn là một huấn luyện viên AI chuyên nghiệp. Dựa vào thông tin của khách hàng sau đây,
+hãy đưa ra 1 chẩn đoán ngắn gọn (diagnosis), 1 tiêu đề (title) cho lời khuyên,
+và 3 gạch đầu dòng các gợi ý (suggestions) để cải thiện sức khỏe/thể hình.
 
-LƯU Ý QUAN TRỌNG: Mọi nội dung trả về (title, ai_diagnosis, ai_suggestions) BẮT BUỘC PHẢI ĐƯỢC VIẾT HOÀN TOÀN BẰNG TIẾNG VIỆT.
-
-Hãy trả về ĐÚNG định dạng JSON sau, không kèm markdown hay text nào khác:
+LƯU Ý: Mọi nội dung (title, ai_diagnosis, ai_suggestions) BẮT BUỘC bằng TIẾNG VIỆT.
+Trả về ĐÚNG định dạng JSON sau, không kèm markdown hay text nào khác:
 {
-  \"title\": \"Tiêu đề lời khuyên bằng tiếng việt\",
-  \"ai_diagnosis\": \"Chẩn đoán ngắn gọn về thể trạng hiện tại bằng tiếng việt\",
-  \"ai_suggestions\": \"- Gợi ý 1 bằng tiếng việt\\n- Gợi ý 2 bằng tiếng việt\\n- Gợi ý 3 bằng tiếng việt\"
+  "title": "Tiêu đề lời khuyên",
+  "ai_diagnosis": "Chẩn đoán ngắn gọn về thể trạng hiện tại",
+  "ai_suggestions": "- Gợi ý 1\n- Gợi ý 2\n- Gợi ý 3"
 }
 
 Thông tin khách hàng:
 - Giới tính: {$user->gender}
 - Mục tiêu/Ghi chú sức khỏe: {$goalText}
-- Chỉ số sức khỏe mới nhất: {$metricsText}";
+- Chỉ số sức khỏe mới nhất: {$metricsText}
+PROMPT;
 
-                $responseJson = $this->callAI($groqService, $geminiService, $prompt);
-                $responseJson = str_replace(['```json', '```'], '', $responseJson);
-                $parsed = json_decode(trim($responseJson), true);
+                $parsed = $this->callAiAndParse($groq, $gemini, $prompt, ['title', 'ai_diagnosis', 'ai_suggestions']);
 
-                if (!$parsed || !isset($parsed['title'])) {
-                    throw new \Exception("AI trả về dữ liệu không đúng định dạng JSON.");
-                }
-
-                // Lưu vào database
                 $rec = AiRecommendation::create([
                     'user_id'             => $user->id,
                     'recommendation_type' => 'Health & Fitness',
@@ -132,414 +140,434 @@ Thông tin khách hàng:
                     'is_system_created'   => true,
                 ]);
 
-                return $this->handleAiSuccess($rec, 'Tạo gợi ý sức khỏe thành công (Kết quả mới)');
+                // Trả về array thuần — Cache serializes tốt hơn Eloquent model
+                return $rec->toArray();
             });
+
+            return $this->successResponse($cachedData, 'Tạo gợi ý sức khỏe thành công');
 
         } catch (\Exception $e) {
             Cache::forget($cacheKey);
-            return $this->handleAiError($e, 'Health');
+            return $this->errorResponse($e, 'Health & Fitness');
         }
     }
 
+    // =========================================================================
+    // AI GENERATION — Dành cho Admin / Manager
+    // =========================================================================
+
     /**
-     * Phân tích và Dự báo hành vi Hội viên (Churn Prediction)
-     * Dành cho Admin/Manager để dự báo tỷ lệ rời bỏ
+     * Dự báo rủi ro rời bỏ hội viên (Churn Prediction).
      * POST /api/admin/churn-prediction
      */
-    public function predictChurn(Request $request, GroqService $groqService, GeminiService $geminiService)
+    public function predictChurn(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
-        // 1. Lấy tất cả user có role là 'member' kèm theo dữ liệu liên quan
-        $members = \App\Models\User::whereHas('role', function($q) {
-            $q->where('role_name', 'member');
-        })->with(['memberProfile', 'activeSubscription', 'checkins' => function($q) {
-            $q->where('check_in_at', '>=', now()->subMonths(3));
-        }])->get();
+        $members = \App\Models\User::whereHas('role', fn($q) => $q->where('role_name', 'member'))
+            ->with([
+                'memberProfile',
+                'activeSubscription',
+                'checkins' => fn($q) => $q->where('check_in_at', '>=', now()->subMonths(3)),
+            ])->get();
 
         if ($members->isEmpty()) {
             return response()->json(['message' => 'Không có hội viên nào để phân tích.'], 404);
         }
 
-        // 2. Tạo chuỗi dữ liệu ẩn danh để gửi cho AI
-        $membersData = [];
-        foreach ($members as $member) {
-            $checkinCount = $member->checkins->count();
+        $membersData = $members->map(function ($member) {
             $daysLeft = 0;
-            if ($member->activeSubscription && $member->activeSubscription->end_date) {
-                $endDate = \Carbon\Carbon::parse($member->activeSubscription->end_date);
-                $daysLeft = now()->diffInDays($endDate, false); // Âm nếu đã hết hạn
+            if ($member->activeSubscription?->end_date) {
+                $daysLeft = (int) now()->diffInDays(
+                    Carbon::parse($member->activeSubscription->end_date),
+                    false
+                );
             }
-            $goal = $member->memberProfile->health_notes ?? 'Không rõ mục tiêu';
-
-            $membersData[] = [
-                'user_id' => $member->id,
-                'checkin_last_3_months' => $checkinCount,
-                'days_until_expiration' => intval($daysLeft),
-                'goal' => $goal
+            return [
+                'user_id'               => $member->id,
+                'checkin_last_3_months' => $member->checkins->count(),
+                'days_until_expiration' => $daysLeft,
+                'goal'                  => $member->memberProfile->health_notes ?? 'Không rõ mục tiêu',
             ];
-        }
+        })->values()->toArray();
 
-        $jsonInput = json_encode($membersData, JSON_UNESCAPED_UNICODE);
-
-        $cacheKey = 'ai_churn_prediction_latest';
+        $cacheKey = 'ai_churn_prediction_' . now()->format('Ymd_H');
 
         try {
-            return Cache::remember($cacheKey, now()->addHour(), function() use ($groqService, $geminiService, $jsonInput) {
-                $prompt = "Bạn là chuyên gia phân tích dữ liệu khách hàng (Churn Prediction) cho phòng Gym.
+            // Cache lưu array kết quả, KHÔNG lưu Response object
+            $cachedData = Cache::remember($cacheKey, now()->addHour(), function () use ($groq, $gemini, $membersData) {
+                $jsonInput = json_encode($membersData, JSON_UNESCAPED_UNICODE);
+
+                $prompt = <<<PROMPT
+Bạn là chuyên gia phân tích dữ liệu khách hàng (Churn Prediction) cho phòng Gym.
 Dưới đây là dữ liệu ẩn danh của các hội viên:
-$jsonInput
+{$jsonInput}
 
-Dựa vào dữ liệu, phân loại hội viên theo rủi ro rời bỏ (Không gia hạn):
-- risk_level: 'Đỏ' (Nguy cơ cao: ít tập, sắp hết hạn) hoặc 'Vàng' (Cần lưu ý) hoặc 'Xanh' (Ổn định).
-- ai_diagnosis: Lý do tại sao xếp loại như vậy.
-- ai_suggestions: 1 hành động chăm sóc cụ thể.
+Phân loại mỗi hội viên theo rủi ro rời bỏ:
+- "Đỏ"   → Nguy cơ cao (ít tập, sắp/đã hết hạn)
+- "Vàng" → Cần lưu ý
+- "Xanh" → Ổn định
 
-LƯU Ý: Nội dung trả về BẮT BUỘC bằng Tiếng Việt.
+LƯU Ý: Nội dung BẮT BUỘC bằng Tiếng Việt.
 Trả về ĐÚNG định dạng MẢNG JSON sau (không kèm markdown):
 [
   {
-    \"user_id\": 1,
-    \"risk_level\": \"Đỏ\",
-    \"ai_diagnosis\": \"Lý do...\",
-    \"ai_suggestions\": \"Hành động...\"
+    "user_id": 1,
+    "risk_level": "Đỏ",
+    "ai_diagnosis": "Lý do...",
+    "ai_suggestions": "Hành động chăm sóc cụ thể..."
   }
-]";
+]
+PROMPT;
 
-                $responseJson = $this->callAI($groqService, $geminiService, $prompt);
-                $responseJson = str_replace(['```json', '```'], '', $responseJson);
-                $parsedArray = json_decode(trim($responseJson), true);
+                $raw         = $this->callAI($groq, $gemini, $prompt);
+                $raw         = preg_replace('/```json|```/', '', $raw);
+                $parsedArray = json_decode(trim($raw), true);
 
-                if (!$parsedArray || !is_array($parsedArray)) {
-                    throw new \Exception("AI trả về sai định dạng mảng JSON.");
+                if (!is_array($parsedArray) || empty($parsedArray)) {
+                    throw new \Exception('AI trả về sai định dạng mảng JSON cho Churn Prediction.');
                 }
 
                 $results = [];
                 foreach ($parsedArray as $item) {
-                    if (isset($item['user_id'])) {
-                        $rec = \App\Models\AiRecommendation::create([
-                            'user_id'             => $item['user_id'],
-                            'recommendation_type' => 'Churn Prediction',
-                            'title'               => 'Dự báo rủi ro rời bỏ: Mức độ ' . ($item['risk_level'] ?? 'Không rõ'),
-                            'ai_diagnosis'        => $item['ai_diagnosis'] ?? '',
-                            'ai_suggestions'      => $item['ai_suggestions'] ?? '',
-                            'is_system_created'   => true,
-                        ]);
-                        $results[] = $rec;
-                    }
+                    if (!isset($item['user_id'])) continue;
+
+                    $rec = AiRecommendation::create([
+                        'user_id'             => $item['user_id'],
+                        'recommendation_type' => 'Churn Prediction',
+                        'title'               => 'Dự báo rủi ro rời bỏ: Mức độ ' . ($item['risk_level'] ?? 'Không rõ'),
+                        'ai_diagnosis'        => $item['ai_diagnosis']   ?? '',
+                        'ai_suggestions'      => $item['ai_suggestions'] ?? '',
+                        'is_system_created'   => true,
+                    ]);
+
+                    $results[] = $rec->toArray();
                 }
 
-                return $this->handleAiSuccess($results, 'Dự báo rời bỏ thành công (Kết quả mới)');
+                return $results; // array thuần, Cache-safe
             });
+
+            return $this->successResponse($cachedData, 'Dự báo rời bỏ thành công');
 
         } catch (\Exception $e) {
             Cache::forget($cacheKey);
-            return $this->handleAiError($e, 'Churn');
+            return $this->errorResponse($e, 'Churn Prediction');
         }
     }
 
     /**
-     * Báo cáo tổng quan hoạt động phòng gym (Dành cho Quản lý)
+     * Báo cáo tổng quan kinh doanh (dành cho Quản lý).
      * POST /api/admin/manager-report
      */
-    public function generateManagerReport(Request $request, GroqService $groqService, GeminiService $geminiService)
+    public function generateManagerReport(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
-        // Sử dụng Cache để tránh gọi AI quá nhiều lần trong thời gian ngắn (15 phút)
-        $cacheKey = 'ai_manager_report_latest';
-        
+        $cacheKey = 'ai_manager_report_' . now()->format('Ymd_H');
+
         try {
-            return Cache::remember($cacheKey, now()->addMinutes(15), function() use ($request, $groqService, $geminiService) {
-                // 1. Thu thập dữ liệu doanh thu
-                $currentMonthRevenue = \App\Models\Payment::where('status', 'paid')
-                    ->whereMonth('payment_date', now()->month)
-                    ->whereYear('payment_date', now()->year)
-                    ->sum('amount');
-                    
-                $lastMonthRevenue = \App\Models\Payment::where('status', 'paid')
-                    ->whereMonth('payment_date', now()->subMonth()->month)
-                    ->whereYear('payment_date', now()->subMonth()->year)
+            $cachedData = Cache::remember($cacheKey, now()->addMinutes(15), function () use ($request, $groq, $gemini) {
+                $currentMonth = now();
+                $lastMonth    = now()->subMonth(); // Lưu vào biến, tránh gọi subMonth() nhiều lần
+
+                $currentRevenue = \App\Models\Payment::where('status', 'paid')
+                    ->whereMonth('payment_date', $currentMonth->month)
+                    ->whereYear('payment_date', $currentMonth->year)
                     ->sum('amount');
 
-                // 2. Tỷ lệ giữ chân khách hàng
-                $totalSubscriptions = \App\Models\MemberSubscription::count();
-                $activeSubscriptions = \App\Models\MemberSubscription::where('status', 'active')->count();
-                $retentionRate = $totalSubscriptions > 0 ? round(($activeSubscriptions / $totalSubscriptions) * 100, 2) : 0;
+                $lastRevenue = \App\Models\Payment::where('status', 'paid')
+                    ->whereMonth('payment_date', $lastMonth->month)
+                    ->whereYear('payment_date', $lastMonth->year)
+                    ->sum('amount');
 
-                // 3. Phân tích gói tập
+                $totalSubs  = \App\Models\MemberSubscription::count();
+                $activeSubs = \App\Models\MemberSubscription::where('status', 'active')->count();
+
                 $topPlans = \App\Models\MembershipPlan::withCount('subscriptions')
                     ->orderBy('subscriptions_count', 'desc')
-                    ->take(3)
-                    ->get()
-                    ->map(fn($p) => $p->plan_name . " ({$p->subscriptions_count})")->implode(', ');
+                    ->take(3)->get()
+                    ->map(fn($p) => "{$p->plan_name} ({$p->subscriptions_count})")
+                    ->implode(', ');
 
-                // 4. Phản hồi khách hàng
-                $avgRating = \App\Models\MemberFeedback::avg('rating') ?? 0;
+                $avgRating   = round(\App\Models\MemberFeedback::avg('rating') ?? 0, 1);
                 $urgentCount = \App\Models\MemberFeedback::whereIn('ai_severity', ['High', 'Critical'])->count();
 
                 $businessData = [
-                    'revenue_current' => $currentMonthRevenue,
-                    'revenue_last' => $lastMonthRevenue,
-                    'retention_rate' => $retentionRate,
-                    'top_plans' => $topPlans,
-                    'avg_rating' => round($avgRating, 1),
-                    'urgent_feedback' => $urgentCount
+                    'revenue_current'  => $currentRevenue,
+                    'revenue_last'     => $lastRevenue,
+                    'revenue_growth_pct' => $lastRevenue > 0
+                        ? round(($currentRevenue - $lastRevenue) / $lastRevenue * 100, 1)
+                        : 0,
+                    'retention_rate'   => $totalSubs > 0 ? round($activeSubs / $totalSubs * 100, 2) : 0,
+                    'top_plans'        => $topPlans,
+                    'avg_rating'       => $avgRating,
+                    'urgent_feedback'  => $urgentCount,
                 ];
 
-                $prompt = "Bạn là chuyên gia cố vấn chiến lược phòng Gym. Phân tích dữ liệu sau và trả về JSON: " . json_encode($businessData) . 
-                          "\nYêu cầu JSON: { \"title\": \"...\", \"ai_diagnosis\": \"...\", \"ai_suggestions\": \"- Gợi ý 1\\n- Gợi ý 2\" } (Tiếng Việt)";
+                $prompt = 'Bạn là chuyên gia cố vấn chiến lược phòng Gym. Phân tích dữ liệu sau và trả về JSON '
+                    . '(Tiếng Việt, không markdown): '
+                    . json_encode($businessData, JSON_UNESCAPED_UNICODE)
+                    . "\nYêu cầu JSON: { \"title\": \"...\", \"ai_diagnosis\": \"...\", \"ai_suggestions\": \"- Gợi ý 1\\n- Gợi ý 2\" }";
 
-                $responseJson = $this->callAI($groqService, $geminiService, $prompt);
-                $responseJson = str_replace(['```json', '```'], '', $responseJson);
-                $parsed = json_decode(trim($responseJson), true);
-
-                if (!$parsed || !isset($parsed['title'])) {
-                    throw new \Exception("AI trả về dữ liệu không đúng định dạng JSON.");
-                }
-
-                // Lưu vào database để có lịch sử
-                $rec = \App\Models\AiRecommendation::create([
-                    'user_id'             => $request->user() ? $request->user()->id : 1,
-                    'recommendation_type' => 'Business Report',
-                    'title'               => $parsed['title'],
-                    'ai_diagnosis'        => $parsed['ai_diagnosis'],
-                    'ai_suggestions'      => $parsed['ai_suggestions'],
-                    'is_system_created'   => true,
-                ]);
-
-                return $this->handleAiSuccess($rec, 'Tạo báo cáo quản lý thành công (Kết quả mới)');
+                return $this->runAiReport($groq, $gemini, $prompt, 'Business Report', $request);
             });
+
+            return response()->json($cachedData, 201);
 
         } catch (\Exception $e) {
             Cache::forget($cacheKey);
-            return $this->handleAiError($e, 'Manager Report');
+            return $this->errorResponse($e, 'Manager Report');
         }
     }
 
     /**
+     * Phân tích tỉ lệ giữ chân khách hàng.
      * POST /api/manager/retention-analysis
-     * [2] Phân tích tỉ lệ giữ chân khách hàng
      */
-    public function retentionAnalysis(Request $request, GroqService $groq, GeminiService $gemini)
+    public function retentionAnalysis(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
         $cacheKey = 'ai_manager_retention_' . now()->format('Ymd_H');
         try {
-            return Cache::remember($cacheKey, now()->addMinutes(30), function() use ($request, $groq, $gemini) {
-                $total  = \App\Models\MemberSubscription::count();
-                $active = \App\Models\MemberSubscription::where('status', 'active')->count();
-                $expired= \App\Models\MemberSubscription::where('status', 'expired')->count();
+            $data = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($request, $groq, $gemini) {
+                $total     = \App\Models\MemberSubscription::count();
+                $active    = \App\Models\MemberSubscription::where('status', 'active')->count();
+                $expired   = \App\Models\MemberSubscription::where('status', 'expired')->count();
                 $cancelled = \App\Models\MemberSubscription::where('status', 'cancelled')->count();
 
-                // Tỉ lệ gia hạn trong 30 ngày qua
-                $renewals = \App\Models\MemberSubscription::where('created_at', '>=', now()->subDays(30))
-                    ->whereColumn('created_at', '>', 'updated_at')->count();
+                // Đếm subscription được cập nhật (gia hạn) trong 30 ngày qua
+                // updated_at > created_at nghĩa là record đã bị chỉnh sửa (gia hạn)
+                $renewals = \App\Models\MemberSubscription::where('updated_at', '>=', now()->subDays(30))
+                    ->whereColumn('updated_at', '>', 'created_at')
+                    ->count();
 
-                // Check-in trung bình/tuần
-                $avgCheckins = \App\Models\Checkin::where('check_in_at', '>=', now()->subDays(30))
-                    ->count() / 4;
+                $avgCheckins = round(
+                    \App\Models\Checkin::where('check_in_at', '>=', now()->subDays(30))->count() / 4,
+                    1
+                );
 
-                $data = compact('total', 'active', 'expired', 'cancelled', 'renewals') + [
-                    'retention_rate_pct' => $total > 0 ? round($active / $total * 100, 1) : 0,
-                    'avg_checkins_per_week' => round($avgCheckins, 1),
+                $payload = [
+                    'total'                 => $total,
+                    'active'                => $active,
+                    'expired'               => $expired,
+                    'cancelled'             => $cancelled,
+                    'renewals_last_30d'     => $renewals,
+                    'retention_rate_pct'    => $total > 0 ? round($active / $total * 100, 1) : 0,
+                    'avg_checkins_per_week' => $avgCheckins,
                 ];
 
-                $prompt = "Bạn là chuyên gia phân tích giữ chân khách hàng cho phòng Gym (Customer Retention).
-Dữ liệu hội viên: " . json_encode($data, JSON_UNESCAPED_UNICODE) . "
+                $prompt = 'Bạn là chuyên gia phân tích giữ chân khách hàng (Customer Retention) cho phòng Gym.
+Dữ liệu hội viên: ' . json_encode($payload, JSON_UNESCAPED_UNICODE) . '
 
-Hãy phân tích chuyên sâu: nguyên nhân rời bỏ, nhóm nguy cơ cao, xu hướng, và đề xuất chiến lược giữ chân cụ thể.
+Phân tích: nguyên nhân rời bỏ, nhóm nguy cơ cao, xu hướng, chiến lược giữ chân cụ thể.
 Trả về JSON (Tiếng Việt, không markdown):
 {
-  \"title\": \"...\",
-  \"ai_diagnosis\": \"Phân tích chi tiết 3-4 câu\",
-  \"ai_suggestions\": \"- Chiến lược 1\\n- Chiến lược 2\\n- Chiến lược 3\",
-  \"key_metrics\": {\"retention_rate\": \"...\", \"risk_group\": \"...\", \"trend\": \"...\"}
-}";
+  "title": "...",
+  "ai_diagnosis": "Phân tích chi tiết 3-4 câu",
+  "ai_suggestions": "- Chiến lược 1\n- Chiến lược 2\n- Chiến lược 3",
+  "key_metrics": {"retention_rate": "...", "risk_group": "...", "trend": "..."}
+}';
 
                 return $this->runAiReport($groq, $gemini, $prompt, 'Retention Analysis', $request);
             });
+
+            return response()->json($data, 201);
+
         } catch (\Exception $e) {
             Cache::forget($cacheKey);
-            return $this->handleAiError($e, 'Retention Analysis');
+            return $this->errorResponse($e, 'Retention Analysis');
         }
     }
 
     /**
+     * Phân tích hiệu quả các gói tập.
      * POST /api/manager/plan-effectiveness
-     * [3] Phân tích hiệu quả gói tập
      */
-    public function planEffectiveness(Request $request, GroqService $groq, GeminiService $gemini)
+    public function planEffectiveness(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
         $cacheKey = 'ai_manager_plan_eff_' . now()->format('Ymd_H');
         try {
-            return Cache::remember($cacheKey, now()->addMinutes(30), function() use ($request, $groq, $gemini) {
+            $data = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($request, $groq, $gemini) {
                 $plans = \App\Models\MembershipPlan::withCount([
                     'subscriptions',
                     'subscriptions as active_count' => fn($q) => $q->where('status', 'active'),
                 ])->get()->map(fn($p) => [
-                    'name'         => $p->plan_name,
-                    'price'        => $p->price,
-                    'duration_days'=> $p->duration_days,
-                    'total_subs'   => $p->subscriptions_count,
-                    'active_subs'  => $p->active_count,
-                    'revenue_est'  => $p->subscriptions_count * $p->price,
+                    'name'          => $p->plan_name,
+                    'price'         => $p->price,
+                    'duration_days' => $p->duration_days,
+                    'total_subs'    => $p->subscriptions_count,
+                    'active_subs'   => $p->active_count,
+                    'revenue_est'   => $p->subscriptions_count * $p->price,
                 ]);
 
-                $prompt = "Bạn là chuyên gia phân tích sản phẩm dịch vụ cho phòng Gym.
-Dữ liệu các gói tập: " . json_encode($plans, JSON_UNESCAPED_UNICODE) . "
+                $prompt = 'Bạn là chuyên gia phân tích sản phẩm dịch vụ cho phòng Gym.
+Dữ liệu các gói tập: ' . json_encode($plans, JSON_UNESCAPED_UNICODE) . '
 
-Phân tích: gói nào bán chạy nhất, gói nào kém hiệu quả, cơ hội tối ưu danh mục gói tập.
+Phân tích: gói bán chạy nhất, gói kém hiệu quả, cơ hội tối ưu danh mục.
 Trả về JSON (Tiếng Việt, không markdown):
 {
-  \"title\": \"...\",
-  \"ai_diagnosis\": \"Phân tích chi tiết 3-4 câu\",
-  \"ai_suggestions\": \"- Đề xuất 1\\n- Đề xuất 2\\n- Đề xuất 3\",
-  \"best_plan\": \"...\",
-  \"worst_plan\": \"...\"
-}";
+  "title": "...",
+  "ai_diagnosis": "Phân tích chi tiết 3-4 câu",
+  "ai_suggestions": "- Đề xuất 1\n- Đề xuất 2\n- Đề xuất 3",
+  "best_plan": "...",
+  "worst_plan": "..."
+}';
 
                 return $this->runAiReport($groq, $gemini, $prompt, 'Plan Effectiveness', $request);
             });
+
+            return response()->json($data, 201);
+
         } catch (\Exception $e) {
             Cache::forget($cacheKey);
-            return $this->handleAiError($e, 'Plan Effectiveness');
+            return $this->errorResponse($e, 'Plan Effectiveness');
         }
     }
 
     /**
+     * Phân tích hiệu quả khuyến mãi.
      * POST /api/manager/promotion-effectiveness
-     * [4] Phân tích hiệu quả khuyến mãi
      */
-    public function promotionEffectiveness(Request $request, GroqService $groq, GeminiService $gemini)
+    public function promotionEffectiveness(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
         $cacheKey = 'ai_manager_promo_eff_' . now()->format('Ymd_H');
         try {
-            return Cache::remember($cacheKey, now()->addMinutes(30), function() use ($request, $groq, $gemini) {
+            $data = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($request, $groq, $gemini) {
                 $promos = \App\Models\Promotion::withCount('payments')
                     ->with('payments')
-                    ->get()
-                    ->map(fn($p) => [
-                        'name'          => $p->name,
-                        'type'          => $p->discount_type,
-                        'value'         => $p->discount_value,
-                        'start_date'    => $p->start_date,
-                        'end_date'      => $p->end_date,
-                        'usage_count'   => $p->payments_count,
-                        'revenue_impact'=> $p->payments->sum('amount'),
+                    ->get()->map(fn($p) => [
+                        'name'           => $p->name,
+                        'type'           => $p->discount_type,
+                        'value'          => $p->discount_value,
+                        'start_date'     => $p->start_date,
+                        'end_date'       => $p->end_date,
+                        'usage_count'    => $p->payments_count,
+                        'revenue_impact' => $p->payments->sum('amount'),
                     ]);
 
-                $prompt = "Bạn là chuyên gia phân tích hiệu quả marketing và khuyến mãi cho phòng Gym.
-Dữ liệu chiến dịch khuyến mãi: " . json_encode($promos, JSON_UNESCAPED_UNICODE) . "
+                $prompt = 'Bạn là chuyên gia phân tích hiệu quả marketing và khuyến mãi cho phòng Gym.
+Dữ liệu chiến dịch: ' . json_encode($promos, JSON_UNESCAPED_UNICODE) . '
 
-Phân tích: chiến dịch nào hiệu quả nhất, ROI, đề xuất cải thiện chính sách khuyến mãi.
+Phân tích: chiến dịch hiệu quả nhất, ROI, đề xuất cải thiện chính sách.
 Trả về JSON (Tiếng Việt, không markdown):
 {
-  \"title\": \"...\",
-  \"ai_diagnosis\": \"Phân tích chi tiết 3-4 câu\",
-  \"ai_suggestions\": \"- Đề xuất 1\\n- Đề xuất 2\\n- Đề xuất 3\",
-  \"best_promotion\": \"...\",
-  \"recommendation\": \"...\"
-}";
+  "title": "...",
+  "ai_diagnosis": "Phân tích chi tiết 3-4 câu",
+  "ai_suggestions": "- Đề xuất 1\n- Đề xuất 2\n- Đề xuất 3",
+  "best_promotion": "...",
+  "recommendation": "..."
+}';
 
                 return $this->runAiReport($groq, $gemini, $prompt, 'Promotion Effectiveness', $request);
             });
+
+            return response()->json($data, 201);
+
         } catch (\Exception $e) {
             Cache::forget($cacheKey);
-            return $this->handleAiError($e, 'Promotion Effectiveness');
+            return $this->errorResponse($e, 'Promotion Effectiveness');
         }
     }
 
     /**
+     * Phân tích phản hồi khách hàng.
      * POST /api/manager/feedback-analysis
-     * [5] Phân tích phản hồi khách hàng
      */
-    public function feedbackAnalysis(Request $request, GroqService $groq, GeminiService $gemini)
+    public function feedbackAnalysis(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
         $cacheKey = 'ai_manager_feedback_' . now()->format('Ymd_H');
         try {
-            return Cache::remember($cacheKey, now()->addMinutes(30), function() use ($request, $groq, $gemini) {
-                $avgRating   = round(\App\Models\MemberFeedback::avg('rating') ?? 0, 1);
-                $total       = \App\Models\MemberFeedback::count();
-                $urgent      = \App\Models\MemberFeedback::whereIn('ai_severity', ['High', 'Critical'])->count();
-                $byRating    = \App\Models\MemberFeedback::selectRaw('rating, count(*) as cnt')
+            $data = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($request, $groq, $gemini) {
+                $avgRating = round(\App\Models\MemberFeedback::avg('rating') ?? 0, 1);
+                $total     = \App\Models\MemberFeedback::count();
+                $urgent    = \App\Models\MemberFeedback::whereIn('ai_severity', ['High', 'Critical'])->count();
+                $byRating  = \App\Models\MemberFeedback::selectRaw('rating, count(*) as cnt')
                     ->groupBy('rating')->pluck('cnt', 'rating');
-                $recentNeg   = \App\Models\MemberFeedback::where('rating', '<=', 2)
+                $recentNeg = \App\Models\MemberFeedback::where('rating', '<=', 2)
                     ->where('created_at', '>=', now()->subDays(30))
                     ->pluck('content')->take(5);
 
-                $data = compact('avgRating', 'total', 'urgent', 'byRating') + [
+                $payload = compact('avgRating', 'total', 'urgent', 'byRating') + [
                     'recent_negative_samples' => $recentNeg,
                 ];
 
-                $prompt = "Bạn là chuyên gia phân tích trải nghiệm khách hàng (CX) cho phòng Gym.
-Dữ liệu phản hồi: " . json_encode($data, JSON_UNESCAPED_UNICODE) . "
+                $prompt = 'Bạn là chuyên gia phân tích trải nghiệm khách hàng (CX) cho phòng Gym.
+Dữ liệu phản hồi: ' . json_encode($payload, JSON_UNESCAPED_UNICODE) . '
 
-Phân tích: điểm đau chính của khách hàng, xu hướng cảm xúc, vấn đề cần giải quyết khẩn cấp.
+Phân tích: điểm đau chính, xu hướng cảm xúc, vấn đề cần giải quyết khẩn cấp.
 Trả về JSON (Tiếng Việt, không markdown):
 {
-  \"title\": \"...\",
-  \"ai_diagnosis\": \"Phân tích cảm xúc và xu hướng 3-4 câu\",
-  \"ai_suggestions\": \"- Hành động 1\\n- Hành động 2\\n- Hành động 3\",
-  \"sentiment\": \"Tích cực / Trung lập / Tiêu cực\",
-  \"urgent_issues\": \"...\"
-}";
+  "title": "...",
+  "ai_diagnosis": "Phân tích 3-4 câu",
+  "ai_suggestions": "- Hành động 1\n- Hành động 2\n- Hành động 3",
+  "sentiment": "Tích cực / Trung lập / Tiêu cực",
+  "urgent_issues": "..."
+}';
 
                 return $this->runAiReport($groq, $gemini, $prompt, 'Feedback Analysis', $request);
             });
+
+            return response()->json($data, 201);
+
         } catch (\Exception $e) {
             Cache::forget($cacheKey);
-            return $this->handleAiError($e, 'Feedback Analysis');
+            return $this->errorResponse($e, 'Feedback Analysis');
         }
     }
 
     /**
+     * Báo cáo kinh doanh tháng hiện tại.
      * POST /api/manager/general-report
-     * [6] Báo cáo chung (Business Report)
      */
-    public function generalReport(Request $request, GroqService $groq, GeminiService $gemini)
+    public function generalReport(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
         $cacheKey = 'ai_manager_general_' . now()->format('Ymd_H');
         try {
-            return Cache::remember($cacheKey, now()->addMinutes(15), function() use ($request, $groq, $gemini) {
-                $revenue      = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', now()->month)->sum('amount');
-                $revLast      = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', now()->subMonth()->month)->sum('amount');
-                $newMembers   = \App\Models\User::whereHas('role', fn($q) => $q->where('role_name', 'member'))
-                    ->whereMonth('created_at', now()->month)->count();
-                $totalMembers = \App\Models\User::whereHas('role', fn($q) => $q->where('role_name', 'member'))->count();
-                $checkins     = \App\Models\Checkin::whereMonth('check_in_at', now()->month)->count();
-                $activeContracts = \App\Models\MemberSubscription::where('status', 'active')->count();
-                $pendingPayments = \App\Models\Payment::where('status', 'pending')->count();
+            $data = Cache::remember($cacheKey, now()->addMinutes(15), function () use ($request, $groq, $gemini) {
+                $now      = now();
+                $lastMonth = now()->subMonth(); // lưu biến để tránh drift
 
-                $data = compact('revenue', 'revLast', 'newMembers', 'totalMembers', 'checkins', 'activeContracts', 'pendingPayments') + [
+                $revenue    = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', $now->month)->whereYear('payment_date', $now->year)->sum('amount');
+                $revLast    = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', $lastMonth->month)->whereYear('payment_date', $lastMonth->year)->sum('amount');
+                $newMembers = \App\Models\User::whereHas('role', fn($q) => $q->where('role_name', 'member'))->whereMonth('created_at', $now->month)->count();
+                $total      = \App\Models\User::whereHas('role', fn($q) => $q->where('role_name', 'member'))->count();
+                $checkins   = \App\Models\Checkin::whereMonth('check_in_at', $now->month)->count();
+                $activeContracts  = \App\Models\MemberSubscription::where('status', 'active')->count();
+                $pendingPayments  = \App\Models\Payment::where('status', 'pending')->count();
+
+                $payload = compact('revenue', 'revLast', 'newMembers', 'total', 'checkins', 'activeContracts', 'pendingPayments') + [
                     'revenue_growth_pct' => $revLast > 0 ? round(($revenue - $revLast) / $revLast * 100, 1) : 0,
-                    'month' => now()->format('m/Y'),
+                    'month'              => $now->format('m/Y'),
                 ];
 
-                $prompt = "Bạn là Giám đốc Điều hành phòng Gym, đang viết báo cáo kinh doanh tháng " . now()->format('m/Y') . ".
-Dữ liệu kinh doanh: " . json_encode($data, JSON_UNESCAPED_UNICODE) . "
+                $month  = $now->format('m/Y');
+                $prompt = "Bạn là Giám đốc Điều hành phòng Gym, đang viết báo cáo kinh doanh tháng {$month}.
+Dữ liệu: " . json_encode($payload, JSON_UNESCAPED_UNICODE) . "
 
 Viết báo cáo tổng quan: tình hình kinh doanh, điểm mạnh/yếu, cơ hội cải thiện.
 Trả về JSON (Tiếng Việt, không markdown):
 {
-  \"title\": \"Báo cáo tháng " . now()->format('m/Y') . "\",
-  \"ai_diagnosis\": \"Tóm tắt tình hình 4-5 câu có số liệu cụ thể\",
+  \"title\": \"Báo cáo tháng {$month}\",
+  \"ai_diagnosis\": \"Tóm tắt 4-5 câu có số liệu cụ thể\",
   \"ai_suggestions\": \"- Ưu tiên 1\\n- Ưu tiên 2\\n- Ưu tiên 3\",
   \"overall_health\": \"Tốt / Trung bình / Cần cải thiện\"
 }";
 
                 return $this->runAiReport($groq, $gemini, $prompt, 'General Report', $request);
             });
+
+            return response()->json($data, 201);
+
         } catch (\Exception $e) {
             Cache::forget($cacheKey);
-            return $this->handleAiError($e, 'General Report');
+            return $this->errorResponse($e, 'General Report');
         }
     }
 
     /**
+     * Phân tích sức khỏe hội viên kết hợp nguy cơ rời bỏ.
      * POST /api/manager/health-churn-report
-     * [7] Phân tích sức khỏe hội viên, nguy cơ rời bỏ & báo cáo quản lý
      */
-    public function healthChurnReport(Request $request, GroqService $groq, GeminiService $gemini)
+    public function healthChurnReport(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
         $cacheKey = 'ai_manager_health_churn_' . now()->format('Ymd_H');
         try {
-            return Cache::remember($cacheKey, now()->addMinutes(30), function() use ($request, $groq, $gemini) {
+            $data = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($request, $groq, $gemini) {
                 $members = \App\Models\User::whereHas('role', fn($q) => $q->where('role_name', 'member'))
                     ->with([
                         'memberProfile',
@@ -549,58 +577,63 @@ Trả về JSON (Tiếng Việt, không markdown):
                     ])->get();
 
                 $summary = $members->map(fn($m) => [
-                    'checkins_30d'    => $m->checkins->count(),
-                    'days_left'       => $m->activeSubscription
-                        ? now()->diffInDays(Carbon::parse($m->activeSubscription->end_date), false)
+                    'checkins_30d' => $m->checkins->count(),
+                    'days_left'    => $m->activeSubscription
+                        ? (int) now()->diffInDays(Carbon::parse($m->activeSubscription->end_date), false)
                         : -999,
-                    'bmi'             => optional($m->healthMetrics->first())->bmi,
-                    'body_fat'        => optional($m->healthMetrics->first())->body_fat_percentage,
-                    'goal'            => optional($m->memberProfile)->health_notes ?? 'N/A',
+                    'bmi'          => optional($m->healthMetrics->first())->bmi,
+                    'body_fat'     => optional($m->healthMetrics->first())->body_fat_percentage,
+                    'goal'         => optional($m->memberProfile)->health_notes ?? 'N/A',
                 ]);
 
                 $stats = [
-                    'total_members'    => $members->count(),
-                    'no_checkin_30d'   => $summary->where('checkins_30d', 0)->count(),
-                    'expiring_7d'      => $summary->where('days_left', '>=', 0)->where('days_left', '<=', 7)->count(),
-                    'expired'          => $summary->where('days_left', '<', 0)->count(),
-                    'avg_bmi'          => round($summary->whereNotNull('bmi')->avg('bmi'), 1),
-                    'high_fat_pct'     => $summary->where('body_fat', '>', 25)->count(),
-                    'sample_data'      => $summary->take(10)->values(),
+                    'total_members'  => $members->count(),
+                    'no_checkin_30d' => $summary->where('checkins_30d', 0)->count(),
+                    'expiring_7d'    => $summary->whereBetween('days_left', [0, 7])->count(),
+                    'expired'        => $summary->where('days_left', '<', 0)->count(),
+                    'avg_bmi'        => round($summary->whereNotNull('bmi')->avg('bmi') ?? 0, 1),
+                    'high_fat_count' => $summary->where('body_fat', '>', 25)->count(),
+                    'sample_data'    => $summary->take(10)->values(),
                 ];
 
-                $prompt = "Bạn là chuyên gia sức khỏe và phân tích dữ liệu hội viên phòng Gym.
-Thống kê tổng hợp: " . json_encode($stats, JSON_UNESCAPED_UNICODE) . "
+                $prompt = 'Bạn là chuyên gia sức khỏe và phân tích dữ liệu hội viên phòng Gym.
+Thống kê tổng hợp: ' . json_encode($stats, JSON_UNESCAPED_UNICODE) . '
 
-Hãy phân tích: tình trạng sức khỏe tổng thể hội viên, nhóm có nguy cơ rời bỏ cao, đề xuất can thiệp cho quản lý.
+Phân tích: tình trạng sức khỏe tổng thể, nhóm nguy cơ rời bỏ cao, đề xuất can thiệp cho quản lý.
 Trả về JSON (Tiếng Việt, không markdown):
 {
-  \"title\": \"...\",
-  \"ai_diagnosis\": \"Phân tích chuyên sâu 4-5 câu về sức khỏe và nguy cơ rời bỏ\",
-  \"ai_suggestions\": \"- Hành động quản lý 1\\n- Hành động quản lý 2\\n- Hành động quản lý 3\",
-  \"churn_risk_count\": \"...\",
-  \"health_alert\": \"...\"
-}";
+  "title": "...",
+  "ai_diagnosis": "Phân tích chuyên sâu 4-5 câu",
+  "ai_suggestions": "- Hành động 1\n- Hành động 2\n- Hành động 3",
+  "churn_risk_count": "...",
+  "health_alert": "..."
+}';
 
                 return $this->runAiReport($groq, $gemini, $prompt, 'Health & Churn Report', $request);
             });
+
+            return response()->json($data, 201);
+
         } catch (\Exception $e) {
             Cache::forget($cacheKey);
-            return $this->handleAiError($e, 'Health & Churn Report');
+            return $this->errorResponse($e, 'Health & Churn Report');
         }
     }
 
     /**
+     * Tổng quan toàn diện — tóm lược từ snapshot DB, không gọi lại các AI con.
      * POST /api/manager/overview
-     * [1] Tổng quan – gọi song song và tóm tắt kết quả từ các phân tích 2-7
      */
-    public function managerOverview(Request $request, GroqService $groq, GeminiService $gemini)
+    public function managerOverview(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
         $cacheKey = 'ai_manager_overview_' . now()->format('Ymd_H');
         try {
-            return Cache::remember($cacheKey, now()->addMinutes(20), function() use ($request, $groq, $gemini) {
-                // Thu thập nhanh số liệu tổng hợp từ DB (không gọi lại AI con)
-                $revenue   = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', now()->month)->sum('amount');
-                $revLast   = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', now()->subMonth()->month)->sum('amount');
+            $data = Cache::remember($cacheKey, now()->addMinutes(20), function () use ($request, $groq, $gemini) {
+                $now       = now();
+                $lastMonth = now()->subMonth();
+
+                $revenue   = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', $now->month)->sum('amount');
+                $revLast   = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', $lastMonth->month)->sum('amount');
                 $active    = \App\Models\MemberSubscription::where('status', 'active')->count();
                 $total     = \App\Models\MemberSubscription::count();
                 $avgRating = round(\App\Models\MemberFeedback::avg('rating') ?? 0, 1);
@@ -611,120 +644,173 @@ Trả về JSON (Tiếng Việt, không markdown):
                 $topPlan   = \App\Models\MembershipPlan::withCount('subscriptions')->orderBy('subscriptions_count', 'desc')->first();
                 $bestPromo = \App\Models\Promotion::withCount('payments')->orderBy('payments_count', 'desc')->first();
 
+                $month    = $now->format('m/Y');
                 $snapshot = [
-                    'month'              => now()->format('m/Y'),
-                    'revenue_this_month' => $revenue,
-                    'revenue_growth_pct' => $revLast > 0 ? round(($revenue - $revLast) / $revLast * 100, 1) : 0,
-                    'retention_rate_pct' => $total > 0 ? round($active / $total * 100, 1) : 0,
-                    'avg_feedback_rating'=> $avgRating,
-                    'urgent_feedbacks'   => $urgent,
-                    'members_no_checkin_30d' => $noCheckin,
-                    'best_selling_plan'  => optional($topPlan)->plan_name,
-                    'best_promotion'     => optional($bestPromo)->name,
+                    'month'                   => $month,
+                    'revenue_this_month'      => $revenue,
+                    'revenue_growth_pct'      => $revLast > 0 ? round(($revenue - $revLast) / $revLast * 100, 1) : 0,
+                    'retention_rate_pct'      => $total > 0 ? round($active / $total * 100, 1) : 0,
+                    'avg_feedback_rating'     => $avgRating,
+                    'urgent_feedbacks'        => $urgent,
+                    'members_no_checkin_30d'  => $noCheckin,
+                    'best_selling_plan'       => optional($topPlan)->plan_name,
+                    'best_promotion'          => optional($bestPromo)->name,
                 ];
 
-                $prompt = "Bạn là trợ lý CEO phòng Gym. Dựa vào snapshot kinh doanh tháng " . now()->format('m/Y') . ":
+                $prompt = "Bạn là trợ lý CEO phòng Gym. Dựa vào snapshot kinh doanh tháng {$month}:
 " . json_encode($snapshot, JSON_UNESCAPED_UNICODE) . "
 
-Viết tóm tắt TỔNG QUAN ngắn gọn bao gồm: doanh thu, giữ chân KH, hiệu quả gói tập, khuyến mãi, phản hồi KH, sức khỏe hội viên.
+Viết tóm tắt TỔNG QUAN ngắn gọn: doanh thu, giữ chân KH, gói tập, khuyến mãi, phản hồi KH, sức khỏe hội viên.
 Trả về JSON (Tiếng Việt, không markdown):
 {
-  \"title\": \"Tổng quan tháng " . now()->format('m/Y') . "\",
-  \"ai_diagnosis\": \"Tóm tắt toàn diện 4-5 câu bao quát tất cả khía cạnh\",
-  \"ai_suggestions\": \"- Ưu tiên hành động 1\\n- Ưu tiên hành động 2\\n- Ưu tiên hành động 3\",
+  \"title\": \"Tổng quan tháng {$month}\",
+  \"ai_diagnosis\": \"Tóm tắt toàn diện 4-5 câu\",
+  \"ai_suggestions\": \"- Ưu tiên 1\\n- Ưu tiên 2\\n- Ưu tiên 3\",
   \"overall_score\": \"X/10\",
   \"key_highlights\": \"...\"
 }";
 
                 return $this->runAiReport($groq, $gemini, $prompt, 'Manager Overview', $request);
             });
+
+            return response()->json($data, 201);
+
         } catch (\Exception $e) {
             Cache::forget($cacheKey);
-            return $this->handleAiError($e, 'Manager Overview');
+            return $this->errorResponse($e, 'Manager Overview');
         }
     }
 
-    /** Helper: gọi AI, parse JSON, lưu DB, trả response */
-    private function runAiReport(GroqService $groq, GeminiService $gemini, string $prompt, string $type, Request $request): \Illuminate\Http\JsonResponse
+    // =========================================================================
+    // PRIVATE HELPERS
+    // =========================================================================
+
+    /**
+     * Gọi AI, strip markdown, parse JSON, validate required keys.
+     *
+     * @param  string[] $requiredKeys
+     * @throws \Exception
+     */
+    private function callAiAndParse(GroqService $groq, GeminiService $gemini, string $prompt, array $requiredKeys = ['title']): array
     {
         $raw    = $this->callAI($groq, $gemini, $prompt);
         $raw    = preg_replace('/```json|```/', '', $raw);
         $parsed = json_decode(trim($raw), true);
 
-        if (!$parsed || !isset($parsed['title'])) {
-            throw new \Exception("AI trả về sai định dạng JSON cho: $type");
+        foreach ($requiredKeys as $key) {
+            if (!isset($parsed[$key])) {
+                throw new \Exception("AI trả về thiếu trường [{$key}] trong JSON.");
+            }
         }
 
+        return $parsed;
+    }
+
+    /**
+     * Helper dùng cho các Manager report:
+     * Gọi AI → parse → lưu DB → trả về array (Cache-safe).
+     *
+     * @return array  Chứa message, data (array), count — KHÔNG phải Response object
+     * @throws \Exception
+     */
+    private function runAiReport(GroqService $groq, GeminiService $gemini, string $prompt, string $type, Request $request): array
+    {
+        $parsed = $this->callAiAndParse($groq, $gemini, $prompt, ['title', 'ai_diagnosis', 'ai_suggestions']);
+
         $rec = AiRecommendation::create([
-            'user_id'             => $request->user() ? $request->user()->id : 1,
+            'user_id'             => $request->user()?->id ?? 1,
             'recommendation_type' => $type,
             'title'               => $parsed['title'],
-            'ai_diagnosis'        => $parsed['ai_diagnosis'] ?? '',
-            'ai_suggestions'      => $parsed['ai_suggestions'] ?? '',
+            'ai_diagnosis'        => $parsed['ai_diagnosis'],
+            'ai_suggestions'      => $parsed['ai_suggestions'],
             'is_system_created'   => true,
         ]);
 
-        // Đính kèm metadata bổ sung vào response (không lưu DB)
+        // Metadata bổ sung từ AI (ngoài 3 trường chuẩn) — đính kèm vào response, không lưu DB
         $extra = array_diff_key($parsed, array_flip(['title', 'ai_diagnosis', 'ai_suggestions']));
 
-        return response()->json([
-            'message' => "$type – Phân tích thành công",
+        return [
+            'message' => "{$type} – Phân tích thành công",
             'data'    => array_merge($rec->toArray(), $extra),
             'count'   => 1,
-        ], 201);
+        ];
     }
 
-
-    private function callAI(GroqService $groqService, GeminiService $geminiService, string $prompt): string
+    /**
+     * Gọi AI theo provider cấu hình trong .env, có fallback tự động.
+     *
+     * @throws \Exception
+     */
+    private function callAI(GroqService $groq, GeminiService $gemini, string $prompt): string
     {
+        $provider = env('AI_PROVIDER', 'groq');
+
+        if ($provider === 'gemini') {
+            try {
+                Log::info('Calling Gemini AI (model=' . env('GEMINI_MODEL') . ')...');
+                return $gemini->askAI($prompt);
+            } catch (\Exception $e) {
+                Log::warning('Gemini thất bại, fallback sang Groq: ' . $e->getMessage());
+                return $groq->askAI($prompt);
+            }
+        }
+
         try {
-            Log::info('Calling Groq AI (' . env('GROQ_MODEL') . ')...');
-            return $groqService->askAI($prompt);
+            Log::info('Calling Groq AI (model=' . env('GROQ_MODEL') . ')...');
+            return $groq->askAI($prompt);
         } catch (\Exception $e) {
-            Log::warning('Groq AI failed, falling back to Gemini: ' . $e->getMessage());
-            return $geminiService->askAI($prompt);
+            Log::warning('Groq thất bại, fallback sang Gemini: ' . $e->getMessage());
+            return $gemini->askAI($prompt);
         }
     }
 
-    /** Helper xử lý lỗi AI tập trung */
-    private function handleAiError(\Exception $e, $context = '')
-    {
-        Log::error("AI Error ($context): " . $e->getMessage() . "\n" . $e->getTraceAsString());
-
-        $errorMessage = $e->getMessage();
-        $friendlyMessage = 'Đã xảy ra lỗi khi gọi AI. Vui lòng thử lại.';
-        $status = 500;
-
-        if (str_contains($errorMessage, '429') || str_contains($errorMessage, 'rate limit') || str_contains($errorMessage, 'quá tải') || str_contains($errorMessage, 'high demand')) {
-            $friendlyMessage = 'Máy chủ AI đang bị quá tải. Vui lòng đợi vài giây và thử lại.';
-            $status = 429;
-        } elseif (str_contains($errorMessage, 'quota')) {
-            preg_match('/retry in ([\d\.]+)s/', $errorMessage, $matches);
-            $waitTime = isset($matches[1]) ? ceil((float)$matches[1]) : null;
-            $friendlyMessage = $waitTime
-                ? "Quá giới hạn yêu cầu. Vui lòng đợi {$waitTime} giây nữa."
-                : 'Bạn đã hết hạn mức sử dụng miễn phí. Vui lòng đợi một lát.';
-            $status = 429;
-        } elseif (str_contains($errorMessage, 'not found') || str_contains($errorMessage, 'model')) {
-            $friendlyMessage = 'Model AI không được hỗ trợ. Vui lòng kiểm tra GROQ_MODEL hoặc GEMINI_MODEL trong .env.';
-        } elseif (str_contains($errorMessage, 'API_KEY') || str_contains($errorMessage, 'chưa được cấu hình')) {
-            $friendlyMessage = 'API Key AI chưa được cấu hình. Vui lòng kiểm tra GROQ_API_KEY trong .env.';
-        }
-
-        return response()->json([
-            'message' => $friendlyMessage,
-            'error'   => $errorMessage,
-            'context' => $context
-        ], $status);
-    }
-
-    /** Helper xử lý thành công AI tập trung */
-    private function handleAiSuccess($data, $message = 'Thành công')
+    /**
+     * Chuẩn hóa response thành công.
+     */
+    private function successResponse(mixed $data, string $message = 'Thành công'): JsonResponse
     {
         return response()->json([
             'message' => $message,
-            'data' => $data,
-            'count' => is_countable($data) ? count($data) : 1
+            'data'    => $data,
+            'count'   => is_countable($data) ? count($data) : 1,
         ], 201);
+    }
+
+    /**
+     * Chuẩn hóa response lỗi với phân loại thân thiện.
+     */
+    private function errorResponse(\Exception $e, string $context = ''): JsonResponse
+    {
+        Log::error("AI Error [{$context}]: " . $e->getMessage() . "\n" . $e->getTraceAsString());
+
+        $message = $e->getMessage();
+        $status  = 500;
+        $friendly = 'Đã xảy ra lỗi khi gọi AI. Vui lòng thử lại.';
+
+        if (str_contains($message, '429') || str_contains($message, 'rate limit')
+            || str_contains($message, 'quá tải') || str_contains($message, 'high demand')) {
+            $friendly = 'Máy chủ AI đang bị quá tải. Vui lòng đợi vài giây và thử lại.';
+            $status   = 429;
+        } elseif (str_contains($message, 'quota')) {
+            preg_match('/retry in ([\d.]+)s/i', $message, $matches);
+            $wait     = isset($matches[1]) ? ceil((float) $matches[1]) : null;
+            $friendly = $wait
+                ? "Quá giới hạn yêu cầu. Vui lòng đợi {$wait} giây nữa."
+                : 'Bạn đã hết hạn mức sử dụng miễn phí. Vui lòng đợi một lát.';
+            $status = 429;
+        } elseif (str_contains($message, 'not found') || str_contains($message, 'model')) {
+            $friendly = 'Model AI không được hỗ trợ. Kiểm tra GROQ_MODEL hoặc GEMINI_MODEL trong .env.';
+        } elseif (str_contains($message, 'API_KEY') || str_contains($message, 'chưa được cấu hình')) {
+            $friendly = 'API Key AI chưa được cấu hình. Kiểm tra GROQ_API_KEY / GEMINI_API_KEY trong .env.';
+        } elseif (str_contains($message, 'thiếu trường') || str_contains($message, 'định dạng JSON')) {
+            $friendly = 'AI trả về dữ liệu không đúng định dạng. Vui lòng thử lại.';
+            $status   = 502;
+        }
+
+        return response()->json([
+            'message' => $friendly,
+            'error'   => $message,
+            'context' => $context,
+        ], $status);
     }
 }
