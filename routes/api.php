@@ -29,14 +29,17 @@ use App\Http\Controllers\Api\SystemSettingController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\ServicePurchaseController;
+use App\Http\Controllers\Api\PasswordResetController;
 use App\Models\User;
 /*
 |--------------------------------------------------------------------------
 | 1. XÁC THỰC (PUBLIC - không cần đăng nhập)
 |--------------------------------------------------------------------------
 */
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login',    [AuthController::class, 'login']);
+Route::post('/register',        [AuthController::class, 'register']);
+Route::post('/login',           [AuthController::class, 'login']);
+Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
+Route::post('/reset-password',  [PasswordResetController::class, 'resetPassword']);
 
 /*
 |--------------------------------------------------------------------------
