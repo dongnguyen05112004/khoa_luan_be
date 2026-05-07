@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\ServicePurchaseController;
 use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\CustomerProgressController;
 use App\Models\User;
 /*
 |--------------------------------------------------------------------------
@@ -54,9 +55,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/me',      [AuthController::class, 'updateMe']);
 
     // API riêng cho Hồ sơ cá nhân của khách hàng (hội viên)
-    Route::get('/customer/profile', [\App\Http\Controllers\Api\CustomerProfileController::class, 'show']);
-    Route::put('/customer/profile', [\App\Http\Controllers\Api\CustomerProfileController::class, 'update']);
+    Route::get('/customer/profile',  [\App\Http\Controllers\Api\CustomerProfileController::class, 'show']);
+    Route::put('/customer/profile',  [\App\Http\Controllers\Api\CustomerProfileController::class, 'update']);
     Route::delete('/customer/profile', [\App\Http\Controllers\Api\CustomerProfileController::class, 'destroy']);
+
+    // Trang Theo dõi tiến trình (Giám sát mục tiêu)
+    Route::get('/customer/progress', [CustomerProgressController::class, 'index']);
 
     /*==========================================================
     | 1. QUẢN LÝ TÀI KHOẢN & PHÂN QUYỀN
