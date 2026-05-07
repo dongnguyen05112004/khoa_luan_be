@@ -45,7 +45,14 @@ class UserController extends Controller
             $targetRoleName = $targetRole ? strtolower($targetRole->role_name) : null;
         }
 
-        // --- Admin: được tạo mọi role ---
+        // Hệ thống chỉ có 1 Admin, không ai được phép tạo thêm (kể cả admin hiện tại)
+        if ($targetRoleName === 'admin') {
+            return response()->json([
+                'message' => 'Hệ thống chỉ cho phép 1 tài khoản Admin duy nhất. Không thể tạo thêm.',
+            ], 403);
+        }
+
+        // --- Admin: được tạo mọi role (trừ admin đã chặn ở trên) ---
         if ($callerRole === 'admin') {
             // Không giới hạn
         }
@@ -84,7 +91,7 @@ class UserController extends Controller
             'name'        => 'required|string|max:255',
             'email'       => 'required|email|unique:users',
             'password'    => 'required|string|min:8',
-            'role_id'     => 'nullable|exists:roles,id',
+            'role_id'     => 'required|exists:roles,id',
             'branch_id'   => 'nullable|exists:branches,id',
             'full_name'   => 'nullable|string|max:150',
             'phone'       => 'nullable|string|max:20',
@@ -139,7 +146,13 @@ class UserController extends Controller
     /** DELETE /api/users/{id} */
     public function destroy($id)
     {
-        User::findOrFail($id)->delete();
+        $userToDelete = User::with('role')->findOrFail($id);
+
+        if (strtolower($userToDelete->role?->role_name) === 'admin') {
+            return response()->json(['message' => 'Không thể xóa tài khoản Admin hệ thống.'], 403);
+        }
+
+        $userToDelete->delete();
         return response()->json(['message' => 'Đã xóa tài khoản']);
     }
 

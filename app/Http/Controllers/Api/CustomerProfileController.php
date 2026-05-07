@@ -21,7 +21,7 @@ class CustomerProfileController extends Controller
         // Load các relationships cần thiết cho trang hồ sơ cá nhân
         $user->load([
             'memberProfile', 
-            'activeSubscription.membershipPlan', 
+            'activeSubscription.plan', 
             'healthMetrics' => function($query) {
                 $query->orderBy('record_date', 'desc')->take(2); // Lấy 2 bản ghi gần nhất để so sánh
             },

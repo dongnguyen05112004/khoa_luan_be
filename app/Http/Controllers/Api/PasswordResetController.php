@@ -66,7 +66,7 @@ class PasswordResetController extends Controller
             });
         } catch (\Exception $e) {
             // Ghi log lỗi mail nhưng không ảnh hưởng response
-            \Log::error('Forgot password mail error: ' . $e->getMessage());
+            Log::error('Forgot password mail error: ' . $e->getMessage());
         }
 
         // Trong môi trường local / debug → trả token thẳng để test dễ hơn
