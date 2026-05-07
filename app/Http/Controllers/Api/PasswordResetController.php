@@ -76,9 +76,14 @@ class PasswordResetController extends Controller
         ];
 
         if (config('app.debug')) {
-            $response['debug_token'] = $token;
-            $response['debug_email'] = $user->email;
-            $response['note'] = 'debug_token chỉ hiển thị khi APP_DEBUG=true. Xóa khỏi production.';
+            $testDomains = ['example.com', 'test.com', 'local', 'dummy.com'];
+            $emailDomain = substr(strrchr($user->email, "@"), 1);
+            
+            if (in_array($emailDomain, $testDomains)) {
+                $response['debug_token'] = $token;
+                $response['debug_email'] = $user->email;
+                $response['note'] = 'debug_token chỉ hiển thị cho email test khi APP_DEBUG=true.';
+            }
         }
 
         return response()->json($response);

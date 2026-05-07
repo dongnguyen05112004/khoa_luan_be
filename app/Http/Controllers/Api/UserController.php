@@ -121,26 +121,63 @@ class UserController extends Controller
     /** PUT /api/users/{id} */
     public function update(Request $request, $id)
     {
-        $user = User::findOrFail($id);
+        $user = User::with(['role', 'memberProfile', 'employeeProfile'])->findOrFail($id);
+        
         $data = $request->validate([
-            'name'      => 'sometimes|string|max:255',
-            'email'     => 'sometimes|email|unique:users,email,' . $id,
-            'password'  => 'sometimes|string|min:8',
-            'role_id'   => 'nullable|exists:roles,id',
-            'branch_id' => 'nullable|exists:branches,id',
-            'full_name' => 'nullable|string|max:150',
-            'phone'     => 'nullable|string|max:20',
-            'gender'    => 'nullable|in:male,female,other',
-            'avatar'    => 'nullable|string|max:255',
+            // User fields
+            'name'        => 'sometimes|string|max:255',
+            'email'       => 'sometimes|email|unique:users,email,' . $id,
+            'password'    => 'sometimes|string|min:8',
+            'role_id'     => 'nullable|exists:roles,id',
+            'branch_id'   => 'nullable|exists:branches,id',
+            'full_name'   => 'nullable|string|max:150',
+            'phone'       => 'nullable|string|max:20',
+            'gender'      => 'nullable|in:male,female,other',
+            'avatar'      => 'nullable|string|max:255',
             'card_number' => 'nullable|string|max:50',
-            'e_number'  => 'nullable|string|max:50',
-            'state'     => 'nullable|in:active,inactive,banned',
+            'e_number'    => 'nullable|string|max:50',
+            'state'       => 'nullable|in:active,inactive,banned',
+
+            // Profile fields (Member)
+            'date_of_birth'     => 'nullable|date',
+            'emergency_contact' => 'nullable|string|max:100',
+            'health_notes'      => 'nullable|string',
+            
+            // Profile fields (Employee)
+            'position'  => 'nullable|string|max:100',
+            'salary'    => 'nullable|numeric',
+            'hire_date' => 'nullable|date',
         ]);
+
         if (isset($data['password'])) {
             $data['password'] = Hash::make($data['password']);
         }
-        $user->update($data);
-        return new UserResource($user->load(['role', 'branch']));
+
+        // Update User
+        $user->update($request->only([
+            'name', 'email', 'password', 'role_id', 'branch_id', 
+            'full_name', 'phone', 'gender', 'avatar', 
+            'card_number', 'e_number', 'state'
+        ]));
+
+        // Update linked Profile if role is member
+        $roleName = strtolower($user->role?->role_name ?? '');
+        
+        if ($roleName === 'member') {
+            $profileData = $request->only(['date_of_birth', 'emergency_contact', 'health_notes']);
+            if (!empty($profileData)) {
+                $user->memberProfile()->updateOrCreate(['user_id' => $user->id], $profileData);
+            }
+        } 
+        // Update linked Profile if role is staff/manager/trainer
+        elseif (in_array($roleName, ['manager', 'staff', 'trainer', 'receptionist'])) {
+            $empData = $request->only(['position', 'salary', 'hire_date']);
+            if (!empty($empData)) {
+                $user->employeeProfile()->updateOrCreate(['user_id' => $user->id], $empData);
+            }
+        }
+
+        return new UserResource($user->load(['role', 'branch', 'memberProfile', 'employeeProfile']));
     }
 
     /** DELETE /api/users/{id} */

@@ -88,18 +88,18 @@ class ServicePurchaseController extends Controller
     {
         $user = $request->user();
 
-        // Gói tập đang active
+        // Gói tập đang active hoặc đang chờ thanh toán
         $activePlan = MemberSubscription::with(['plan', 'promotion'])
             ->where('user_id', $user->id)
-            ->where('status', 'active')
+            ->whereIn('status', ['active', 'pending'])
             ->whereDate('end_date', '>=', Carbon::today())
             ->latest()
             ->first();
 
-        // Hợp đồng PT đang active
+        // Hợp đồng PT đang active hoặc đang chờ thanh toán
         $activePt = PtContract::with(['trainer.user', 'branch'])
             ->where('user_id', $user->id)
-            ->where('status', 'active')
+            ->whereIn('status', ['active', 'pending'])
             ->latest()
             ->first();
 
@@ -139,18 +139,17 @@ class ServicePurchaseController extends Controller
             ], 422);
         }
 
-        // Kiểm tra chống mua chồng chéo:
-        // Nếu hội viên đã có gói tập active và chưa hết hạn → không được mua thêm (trừ gia hạn)
+        // Kiểm tra chống mua chồng chéo: 
+        // Mỗi hội viên chỉ được phép có 1 gói tập duy nhất ở trạng thái active hoặc đang chờ thanh toán.
         $existing = MemberSubscription::where('user_id', $user->id)
-            ->where('plan_id', $data['plan_id'])
             ->whereIn('status', ['active', 'pending'])
             ->whereDate('end_date', '>=', Carbon::today())
             ->first();
 
         if ($existing) {
             return response()->json([
-                'message' => 'Bạn đang có gói tập cùng loại còn hiệu lực. Vui lòng chờ hết hạn hoặc sử dụng chức năng Gia hạn.',
-                'existing_subscription' => $this->formatSubscription($existing),
+                'message' => 'Bạn đang có một gói tập còn hiệu lực hoặc đang chờ thanh toán. Mỗi hội viên chỉ được sử dụng tối đa 1 gói tập tại một thời điểm.',
+                'existing_subscription' => $this->formatSubscription($existing->load('plan')),
             ], 422);
         }
 
@@ -221,15 +220,14 @@ class ServicePurchaseController extends Controller
 
         $trainer = Trainer::with('user')->findOrFail($data['trainer_id']);
 
-        // Kiểm tra hội viên đang có hợp đồng PT còn active với HLV này không
+        // Kiểm tra hội viên đang có hợp đồng PT nào còn active hoặc pending không
         $existingPt = PtContract::where('user_id', $user->id)
-            ->where('trainer_id', $data['trainer_id'])
             ->whereIn('status', ['active', 'pending'])
             ->first();
 
         if ($existingPt) {
             return response()->json([
-                'message'          => 'Bạn đang có hợp đồng PT còn hiệu lực với huấn luyện viên này.',
+                'message'          => 'Bạn đang có một hợp đồng PT còn hiệu lực hoặc đang chờ thanh toán. Mỗi hội viên chỉ được phép đăng ký 1 huấn luyện viên cá nhân tại một thời điểm.',
                 'existing_contract'=> $this->formatPtContract($existingPt->load(['trainer.user', 'branch'])),
             ], 422);
         }
@@ -411,6 +409,29 @@ class ServicePurchaseController extends Controller
         ]);
     }
 
+    /**
+     * Hủy hợp đồng PT đang chờ thanh toán
+     * POST /api/services/cancel-pt/{id}
+     */
+    public function cancelPt(Request $request, $id)
+    {
+        $user = $request->user();
+        $contract = PtContract::where('user_id', $user->id)->findOrFail($id);
+
+        if ($contract->status !== 'pending') {
+            return response()->json([
+                'message' => 'Chỉ có thể hủy hợp đồng đang ở trạng thái "Chờ thanh toán".',
+            ], 422);
+        }
+
+        $contract->update(['status' => 'cancelled']);
+
+        return response()->json([
+            'message' => 'Đã hủy đăng ký hợp đồng PT thành công.',
+            'contract' => $this->formatPtContract($contract->load(['trainer.user', 'branch'])),
+        ]);
+    }
+
     /*==========================================================================
     | HELPERS: Format dữ liệu trả về
     ==========================================================================*/
@@ -464,7 +485,9 @@ class ServicePurchaseController extends Controller
             'start_date'     => $sub->start_date?->toDateString(),
             'end_date'       => $sub->end_date?->toDateString(),
             'price'          => (float) $sub->price,
+            'description'    => $sub->plan?->description,
             'status'         => $sub->status,
+            'state'          => $sub->status, // Alias for frontend compatibility
             'status_label'   => $this->subscriptionStatusLabel($sub->status),
             'days_left'      => $daysLeft > 0 ? $daysLeft : 0,
             'cancel_reason'  => $sub->cancel_reason,
@@ -491,6 +514,7 @@ class ServicePurchaseController extends Controller
             'end_date'         => $contract->end_date?->toDateString(),
             'price'            => (float) $contract->price,
             'status'           => $contract->status,
+            'state'            => $contract->status, // Alias for frontend compatibility
             'status_label'     => $this->ptStatusLabel($contract->status),
             'created_at'       => $contract->created_at,
         ];

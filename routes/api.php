@@ -56,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // API riêng cho Hồ sơ cá nhân của khách hàng (hội viên)
     Route::get('/customer/profile',  [\App\Http\Controllers\Api\CustomerProfileController::class, 'show']);
+    Route::post('/customer/profile/update', [\App\Http\Controllers\Api\CustomerProfileController::class, 'update']);
     Route::put('/customer/profile',  [\App\Http\Controllers\Api\CustomerProfileController::class, 'update']);
     Route::delete('/customer/profile', [\App\Http\Controllers\Api\CustomerProfileController::class, 'destroy']);
 
@@ -255,4 +256,5 @@ Route::middleware('auth:sanctum')->group(function () {
     // Gia hạn & Hủy gói tập
     Route::post('/services/renew-plan/{id}', [ServicePurchaseController::class, 'renewPlan']);   // Gia hạn gói tập
     Route::post('/services/cancel-plan/{id}',[ServicePurchaseController::class, 'cancelPlan']);  // Hủy gói (pending)
+    Route::post('/services/cancel-pt/{id}',  [ServicePurchaseController::class, 'cancelPt']);    // Hủy PT (pending)
 });
