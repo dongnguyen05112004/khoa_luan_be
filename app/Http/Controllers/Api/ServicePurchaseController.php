@@ -179,6 +179,19 @@ class ServicePurchaseController extends Controller
                 'status'       => 'pending',
             ]);
 
+            // Tạo Payment record (pending) để cho phép thanh toán Online/Tại quầy
+            Payment::create([
+                'invoice_number'  => 'INV-' . strtoupper(Str::random(8)),
+                'user_id'         => $user->id,
+                'subscription_id' => $sub->id,
+                'amount'          => $finalPrice,
+                'payment_method'  => 'bank_transfer', // Mặc định là chuyển khoản/online
+                'payment_date'    => Carbon::today()->toDateString(),
+                'status'          => 'pending',
+                'promotion_id'    => $data['promotion_id'] ?? null,
+                'note'            => 'Thanh toán cho gói tập: ' . $plan->plan_name,
+            ]);
+
             $sub->load(['plan', 'promotion']);
 
             return response()->json([
@@ -250,6 +263,19 @@ class ServicePurchaseController extends Controller
                 'end_date'       => $endDate->toDateString(),
                 'price'          => $totalPrice,
                 'status'         => 'pending',
+            ]);
+
+            // Tạo Payment record (pending)
+            Payment::create([
+                'invoice_number' => 'INV-' . strtoupper(Str::random(8)),
+                'user_id'        => $user->id,
+                'payable_id'     => $contract->id,
+                'payable_type'   => PtContract::class,
+                'amount'         => $totalPrice,
+                'payment_method' => 'bank_transfer',
+                'payment_date'   => Carbon::today()->toDateString(),
+                'status'         => 'pending',
+                'note'           => 'Thanh toán hợp đồng PT: ' . ($trainer->user->full_name ?? $trainer->user->name),
             ]);
 
             $contract->load(['trainer.user', 'branch']);
@@ -491,6 +517,7 @@ class ServicePurchaseController extends Controller
             'status_label'   => $this->subscriptionStatusLabel($sub->status),
             'days_left'      => $daysLeft > 0 ? $daysLeft : 0,
             'cancel_reason'  => $sub->cancel_reason,
+            'payment_id'     => $sub->payments()->where('status', 'pending')->first()?->id,
             'created_at'     => $sub->created_at,
         ];
     }
@@ -516,6 +543,7 @@ class ServicePurchaseController extends Controller
             'status'           => $contract->status,
             'state'            => $contract->status, // Alias for frontend compatibility
             'status_label'     => $this->ptStatusLabel($contract->status),
+            'payment_id'       => Payment::where('payable_id', $contract->id)->where('payable_type', PtContract::class)->where('status', 'pending')->first()?->id,
             'created_at'       => $contract->created_at,
         ];
     }

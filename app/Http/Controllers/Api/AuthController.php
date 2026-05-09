@@ -23,12 +23,23 @@ class AuthController extends Controller
             'password'  => 'required|string|min:8|confirmed',
             'phone'     => 'nullable|string|max:20',
             'gender'    => 'nullable|in:male,female,other',
+            'cmnd'      => 'nullable|string|max:20',
         ]);
 
         // Tự động gán role "member"
         $memberRole = Role::where('role_name', 'member')->first();
         if ($memberRole) {
             $data['role_id'] = $memberRole->id;
+        }
+
+        // Tự động gán branch đầu tiên nếu chưa có
+        $firstBranch = \App\Models\Branch::first();
+        if ($firstBranch) {
+            $data['branch_id'] = $firstBranch->id;
+        }
+
+        if ($request->has('cmnd')) {
+            $data['card_number'] = $request->cmnd;
         }
 
         // Tự động sinh name = "Hội viên X" (X = số thứ tự member tiếp theo)
