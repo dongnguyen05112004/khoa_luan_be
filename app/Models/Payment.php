@@ -32,6 +32,11 @@ class Payment extends Model
         return $this->belongsTo(Promotion::class);
     }
 
+    public function payable()
+    {
+        return $this->morphTo();
+    }
+
     // Chỉ lấy các thanh toán đã thành công
     public function scopePaid($query)
     {

@@ -56,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // API riêng cho Hồ sơ cá nhân của khách hàng (hội viên)
     Route::get('/customer/profile',  [\App\Http\Controllers\Api\CustomerProfileController::class, 'show']);
+    Route::post('/customer/profile/update', [\App\Http\Controllers\Api\CustomerProfileController::class, 'update']);
     Route::put('/customer/profile',  [\App\Http\Controllers\Api\CustomerProfileController::class, 'update']);
     Route::delete('/customer/profile', [\App\Http\Controllers\Api\CustomerProfileController::class, 'destroy']);
 
@@ -162,6 +163,10 @@ Route::middleware('auth:sanctum')->group(function () {
     |                    GET  /payments/invoice/{id}
     ==========================================================*/
     // Endpoint đặc biệt (đặt TRƯỚC resource để tránh bị bắt nhầm bởi {id})
+    Route::post('/payment/create',            [PaymentController::class, 'vnpayCreate']);
+    Route::get('/payment/callback',           [PaymentController::class, 'vnpayCallback'])->withoutMiddleware('auth:sanctum');
+    Route::post('/payment/ipn',               [PaymentController::class, 'vnpayIpn'])->withoutMiddleware('auth:sanctum');
+    Route::get('/payment/vnpay-return',       [PaymentController::class, 'vnpayReturn'])->withoutMiddleware('auth:sanctum');
     Route::get('/payments/stats',             [PaymentController::class, 'stats']);
     Route::get('/payments/summary',           [PaymentController::class, 'summary']);
     Route::post('/payments/validate-promo',   [PaymentController::class, 'validatePromo']);
@@ -255,4 +260,5 @@ Route::middleware('auth:sanctum')->group(function () {
     // Gia hạn & Hủy gói tập
     Route::post('/services/renew-plan/{id}', [ServicePurchaseController::class, 'renewPlan']);   // Gia hạn gói tập
     Route::post('/services/cancel-plan/{id}',[ServicePurchaseController::class, 'cancelPlan']);  // Hủy gói (pending)
+    Route::post('/services/cancel-pt/{id}',  [ServicePurchaseController::class, 'cancelPt']);   // Hủy PT (pending)
 });
