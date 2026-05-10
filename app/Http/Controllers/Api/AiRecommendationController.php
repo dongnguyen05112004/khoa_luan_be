@@ -86,7 +86,10 @@ class AiRecommendationController extends Controller
      */
     public function generateForUser(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
-        $user = $request->user()->load([
+        $userId = $request->input('user_id');
+        $user = $userId ? \App\Models\User::findOrFail($userId) : $request->user();
+        
+        $user->load([
             'memberProfile',
             'healthMetrics' => fn($q) => $q->orderBy('record_date', 'desc')->take(2),
         ]);
