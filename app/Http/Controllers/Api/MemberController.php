@@ -525,37 +525,38 @@ class MemberController extends Controller
         $expiryLabel = null;
         if ($activeSub) {
             $endDate = Carbon::parse($activeSub->end_date);
-            $diff = now()->diffInDays($endDate, false);
+            $diff = (int) now()->diffInDays($endDate, false);
             if ($diff > 0) {
                 if ($diff > 365) {
-                    $years = floor($diff / 365);
+                    $years = (int) floor($diff / 365);
                     $expiryLabel = $years . ' year' . ($years > 1 ? 's' : '') . ' left';
                 } elseif ($diff > 30) {
-                    $months = floor($diff / 30);
+                    $months = (int) floor($diff / 30);
                     $expiryLabel = $months . ' month' . ($months > 1 ? 's' : '') . ' left';
                 } else {
                     $expiryLabel = $diff . ' day' . ($diff > 1 ? 's' : '') . ' left';
                 }
             } else {
-                $expiryLabel = abs($diff) . ' day' . (abs($diff) > 1 ? 's' : '') . ' ago';
+                $absDiff = abs($diff);
+                $expiryLabel = $absDiff . ' day' . ($absDiff > 1 ? 's' : '') . ' ago';
             }
         }
 
-        // Tính thời gian last check-in
         $lastCheckinLabel = null;
         if ($lastCheckinAt) {
             $checkinCarbon = Carbon::parse($lastCheckinAt);
             $diffMins = now()->diffInMinutes($checkinCarbon, false);
+            $diffDays = (int) abs(now()->diffInDays($checkinCarbon));
             if ($diffMins >= -60 && $diffMins <= 0) {
-                $lastCheckinLabel = abs($diffMins) . ' min ago';
-            } elseif (abs(now()->diffInDays($checkinCarbon)) === 0) {
+                $lastCheckinLabel = abs((int)$diffMins) . ' min ago';
+            } elseif ($diffDays === 0) {
                 $lastCheckinLabel = 'Today, ' . $checkinCarbon->format('h:i A');
-            } elseif (abs(now()->diffInDays($checkinCarbon)) === 1) {
+            } elseif ($diffDays === 1) {
                 $lastCheckinLabel = 'Yesterday, ' . $checkinCarbon->format('h:i A');
-            } elseif (abs(now()->diffInDays($checkinCarbon)) < 7) {
-                $lastCheckinLabel = now()->diffInDays($checkinCarbon) . ' days ago';
-            } elseif (abs(now()->diffInWeeks($checkinCarbon)) < 5) {
-                $weeks = abs(now()->diffInWeeks($checkinCarbon));
+            } elseif ($diffDays < 7) {
+                $lastCheckinLabel = $diffDays . ' day' . ($diffDays > 1 ? 's' : '') . ' ago';
+            } elseif ($diffDays < 35) {
+                $weeks = (int) abs(now()->diffInWeeks($checkinCarbon));
                 $lastCheckinLabel = $weeks . ' week' . ($weeks > 1 ? 's' : '') . ' ago';
             } else {
                 $lastCheckinLabel = $checkinCarbon->format('M d, Y');

@@ -76,8 +76,8 @@ return new class extends Migration {
     public function down(): void
     {
         Schema::table('trainers', function (Blueprint $table) {
-            if (Schema::hasColumn('trainers', 'experience')) $table->dropColumn('experience');
-            if (Schema::hasColumn('trainers', 'description')) $table->dropColumn('description');
+            $cols = array_filter(['experience', 'description'], fn($c) => Schema::hasColumn('trainers', $c));
+            if ($cols) $table->dropColumn(array_values($cols));
         });
 
         Schema::table('classes', function (Blueprint $table) {
@@ -85,18 +85,18 @@ return new class extends Migration {
         });
 
         Schema::table('member_feedbacks', function (Blueprint $table) {
-            if (Schema::hasColumn('member_feedbacks', 'comment')) $table->dropColumn('comment');
-            if (Schema::hasColumn('member_feedbacks', 'title')) $table->dropColumn('title');
+            $cols = array_filter(['comment', 'title'], fn($c) => Schema::hasColumn('member_feedbacks', $c));
+            if ($cols) $table->dropColumn(array_values($cols));
         });
 
         Schema::table('member_profiles', function (Blueprint $table) {
-            if (Schema::hasColumn('member_profiles', 'profile_picture')) $table->dropColumn('profile_picture');
-            if (Schema::hasColumn('member_profiles', 'membership_type')) $table->dropColumn('membership_type');
+            $cols = array_filter(['profile_picture', 'membership_type'], fn($c) => Schema::hasColumn('member_profiles', $c));
+            if ($cols) $table->dropColumn(array_values($cols));
         });
 
         Schema::table('employee_profiles', function (Blueprint $table) {
-            if (Schema::hasColumn('employee_profiles', 'position')) $table->dropColumn('position');
-            if (Schema::hasColumn('employee_profiles', 'department')) $table->dropColumn('department');
+            $cols = array_filter(['position', 'department'], fn($c) => Schema::hasColumn('employee_profiles', $c));
+            if ($cols) $table->dropColumn(array_values($cols));
         });
 
         Schema::table('health_metrics', function (Blueprint $table) {
@@ -105,8 +105,7 @@ return new class extends Migration {
 
         Schema::table('equipment', function (Blueprint $table) {
             if (Schema::hasColumn('equipment', 'serial_number')) {
-                // MySQL requires dropping the index before the column if they share the same name or to be safe
-                try { $table->dropUnique(['serial_number']); } catch(\Exception $e) {}
+                try { $table->dropUnique(['serial_number']); } catch (\Exception $e) {}
                 $table->dropColumn('serial_number');
             }
         });
@@ -117,7 +116,7 @@ return new class extends Migration {
 
         Schema::table('promotions', function (Blueprint $table) {
             if (Schema::hasColumn('promotions', 'code')) {
-                try { $table->dropUnique(['code']); } catch(\Exception $e) {}
+                try { $table->dropUnique(['code']); } catch (\Exception $e) {}
                 $table->dropColumn('code');
             }
         });
@@ -128,7 +127,7 @@ return new class extends Migration {
 
         Schema::table('pt_contracts', function (Blueprint $table) {
             if (Schema::hasColumn('pt_contracts', 'branch_id')) {
-                try { $table->dropForeign(['branch_id']); } catch(\Exception $e) {}
+                try { $table->dropForeign(['branch_id']); } catch (\Exception $e) {}
                 $table->dropColumn('branch_id');
             }
         });
