@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class AiRecommendation extends Model
 {
+    use \App\Traits\LogsActivity;
+
     protected $fillable = [
         'user_id', 'recommendation_type', 'ai_diagnosis', 'title',
         'ai_suggestions', 'is_system_created', 'created_at_custom', 'ai_next',

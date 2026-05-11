@@ -578,11 +578,11 @@ class PaymentController extends Controller
                 $inputData[$key] = $value;
             }
         }
-
+        
         unset($inputData['vnp_SecureHash']);
         unset($inputData['vnp_SecureHashType']);
         ksort($inputData);
-
+        
         $i = 0;
         $hashData = "";
         foreach ($inputData as $key => $value) {
@@ -641,44 +641,44 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Đơn hàng này đã được thanh toán'], 400);
         }
 
-        $vnp_TmnCode    = config('vnpay.tmn_code');
+        $vnp_TmnCode = config('vnpay.tmn_code');
         $vnp_HashSecret = config('vnpay.hash_secret');
-        $vnp_Url        = config('vnpay.url');
-        $vnp_Returnurl  = config('vnpay.return_url');
+        $vnp_Url = config('vnpay.url');
+        $vnp_Returnurl = config('vnpay.return_url');
 
         if (empty($vnp_TmnCode) || empty($vnp_HashSecret)) {
             return response()->json(['message' => 'Cấu hình VNPay chưa hoàn tất (Thiếu TMN_CODE hoặc HASH_SECRET)'], 500);
         }
-
-        $vnp_TxnRef    = $payment->id . '_' . time();
+        
+        $vnp_TxnRef = $payment->id . '_' . time(); 
         $vnp_OrderInfo = 'Thanh toan don hang ' . $payment->invoice_number;
         $vnp_OrderType = 'billpayment';
-        $vnp_Amount    = round($payment->amount) * 100; // Đảm bảo là số nguyên
-        $vnp_Locale    = 'vn';
-        $vnp_IpAddr    = $request->ip();
+        $vnp_Amount = round($payment->amount) * 100; // Đảm bảo là số nguyên
+        $vnp_Locale = 'vn';
+        $vnp_IpAddr = $request->ip();
 
-        $inputData = [
-            "vnp_Version"   => "2.1.0",
-            "vnp_TmnCode"   => $vnp_TmnCode,
-            "vnp_Amount"    => $vnp_Amount,
-            "vnp_Command"   => "pay",
-            "vnp_CreateDate"=> date('YmdHis'),
-            "vnp_CurrCode"  => "VND",
-            "vnp_IpAddr"    => $vnp_IpAddr,
-            "vnp_Locale"    => $vnp_Locale,
+        $inputData = array(
+            "vnp_Version" => "2.1.0",
+            "vnp_TmnCode" => $vnp_TmnCode,
+            "vnp_Amount" => $vnp_Amount,
+            "vnp_Command" => "pay",
+            "vnp_CreateDate" => date('YmdHis'),
+            "vnp_CurrCode" => "VND",
+            "vnp_IpAddr" => $vnp_IpAddr,
+            "vnp_Locale" => $vnp_Locale,
             "vnp_OrderInfo" => $vnp_OrderInfo,
             "vnp_OrderType" => $vnp_OrderType,
             "vnp_ReturnUrl" => $vnp_Returnurl,
-            "vnp_TxnRef"    => $vnp_TxnRef,
-        ];
+            "vnp_TxnRef" => $vnp_TxnRef
+        );
 
         if ($request->bank_code) {
             $inputData['vnp_BankCode'] = $request->bank_code;
         }
 
         ksort($inputData);
-        $query    = "";
-        $i        = 0;
+        $query = "";
+        $i = 0;
         $hashdata = "";
         foreach ($inputData as $key => $value) {
             if ($i == 1) {
@@ -697,9 +697,9 @@ class PaymentController extends Controller
         }
 
         return response()->json([
-            'code'    => '00',
+            'code' => '00',
             'message' => 'success',
-            'data'    => $vnp_Url,
+            'data' => $vnp_Url
         ]);
     }
 
@@ -710,8 +710,9 @@ class PaymentController extends Controller
     public function vnpayCallback(Request $request)
     {
         if ($this->verifyVnpayHash($request)) {
+            // Lấy id gốc (bỏ phần timestamp)
             $txnRefParts = explode('_', $request->vnp_TxnRef);
-            $paymentId   = $txnRefParts[0];
+            $paymentId = $txnRefParts[0];
 
             if ($request->vnp_ResponseCode == '00') {
                 return response()->json(['message' => 'Giao dịch thành công', 'payment_id' => $paymentId, 'status' => 'success']);
@@ -729,13 +730,14 @@ class PaymentController extends Controller
     ==========================================================================*/
     public function vnpayReturn(Request $request)
     {
-        $status      = ($request->vnp_ResponseCode == '00') ? 'success' : 'error';
+        // Thường redirect về 1 trang của Frontend (ví dụ: /payment/result)
+        $status = ($request->vnp_ResponseCode == '00') ? 'success' : 'error';
         $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173') . '/payment/result';
-
+        
         $params = http_build_query([
             'status'     => $status,
             'payment_id' => explode('_', $request->vnp_TxnRef)[0],
-            'message'    => $request->vnp_ResponseCode == '00' ? 'Thanh toán thành công' : 'Thanh toán thất bại',
+            'message'    => $request->vnp_ResponseCode == '00' ? 'Thanh toán thành công' : 'Thanh toán thất bại'
         ]);
 
         return redirect($frontendUrl . '?' . $params);
@@ -743,31 +745,33 @@ class PaymentController extends Controller
 
     /*==========================================================================
     | 14. IPN WEBHOOK VNPAY GỌI ĐẾN (Cập nhật database)
-    |     POST /api/payment/ipn
+    |     POST /api/payment/ipn (hoặc GET)
     ==========================================================================*/
     public function vnpayIpn(Request $request)
     {
         if ($this->verifyVnpayHash($request)) {
             $txnRefParts = explode('_', $request->vnp_TxnRef);
-            $paymentId   = $txnRefParts[0] ?? null;
-            $payment     = Payment::find($paymentId);
+            $paymentId = $txnRefParts[0] ?? null;
+            $payment = Payment::find($paymentId);
 
             if ($payment != null) {
+                // Kiểm tra số tiền
                 $amountFromVnPay = $request->vnp_Amount / 100;
                 if ($payment->amount == $amountFromVnPay) {
                     if ($payment->status !== 'paid') {
                         if ($request->vnp_ResponseCode == '00' && $request->vnp_TransactionStatus == '00') {
-                            $payment->status            = 'paid';
+                            $payment->status = 'paid';
                             $payment->payment_confirmed = true;
-                            $payment->payment_date      = Carbon::now();
-                            $payment->payment_method    = 'bank_transfer';
-                            $payment->note              = ($payment->note ? $payment->note . ' | ' : '') . 'Thanh toán qua VNPay, GD: ' . $request->vnp_TransactionNo;
+                            $payment->payment_date = Carbon::now();
+                            $payment->payment_method = 'bank_transfer';
+                            $payment->note = ($payment->note ? $payment->note . ' | ' : '') . 'Thanh toán qua VNPay, GD: ' . $request->vnp_TransactionNo;
                             $payment->save();
-
+                            
                             $this->activateRelatedService($payment);
 
                             return response()->json(['RspCode' => '00', 'Message' => 'Confirm Success']);
                         } else {
+                            // Giao dịch không thành công
                             return response()->json(['RspCode' => '00', 'Message' => 'Confirm Success but transaction failed']);
                         }
                     } else {

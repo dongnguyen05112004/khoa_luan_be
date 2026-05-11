@@ -47,6 +47,7 @@ class CustomerProfileController extends Controller
         $data = $request->validate([
             // Bảng users
             'name'              => 'nullable|string|max:255',
+            'full_name'         => 'nullable|string|max:150',
             'phone'             => 'nullable|string|max:20',
             'gender'            => 'nullable|in:male,female,other',
             'avatar'            => 'nullable|string|max:255',
@@ -55,38 +56,32 @@ class CustomerProfileController extends Controller
             'date_of_birth'     => 'nullable|date',
             'emergency_contact' => 'nullable|string|max:100',
             'health_notes'      => 'nullable|string',
-            'goal'              => 'nullable|string|max:255', // Nếu bạn có cột goal ở đâu đó, có thể lưu vào health_notes
+            'goal'              => 'nullable|string|max:255',
         ]);
 
         DB::beginTransaction();
         try {
             // 1. Cập nhật bảng users
-            $userData = [];
-            if ($request->has('name')) $userData['name'] = $data['name'];
-            if ($request->has('phone')) $userData['phone'] = $data['phone'];
-            if ($request->has('gender')) $userData['gender'] = $data['gender'];
-            if ($request->has('avatar')) $userData['avatar'] = $data['avatar'];
-
-            if (!empty($userData)) {
-                $user->update($userData);
-            }
+            $user->update($request->only([
+                'name', 'full_name', 'phone', 'gender', 'avatar'
+            ]));
 
             // 2. Cập nhật hoặc tạo mới bảng member_profiles
-            $profileData = [];
-            if ($request->has('date_of_birth')) $profileData['date_of_birth'] = $data['date_of_birth'];
-            if ($request->has('emergency_contact')) $profileData['emergency_contact'] = $data['emergency_contact'];
+            $profileData = $request->only(['date_of_birth', 'emergency_contact']);
             
-            // Xử lý goal và health_notes vào chung health_notes nếu database chưa có cột goal
-            $notes = [];
-            if ($request->has('goal')) $notes[] = "Mục tiêu: " . $data['goal'];
-            if ($request->has('health_notes')) $notes[] = $data['health_notes'];
+            // Xử lý goal và health_notes
+            $healthNotes = $request->input('health_notes', '');
+            $goal = $request->input('goal');
             
-            if (!empty($notes)) {
-                $profileData['health_notes'] = implode("\n", $notes);
+            if ($goal) {
+                // Nếu có goal, đính kèm vào health_notes nếu bạn chưa có cột riêng
+                $profileData['health_notes'] = "Mục tiêu: " . $goal . ($healthNotes ? "\n" . $healthNotes : "");
+            } elseif ($request->has('health_notes')) {
+                $profileData['health_notes'] = $healthNotes;
             }
 
             if (!empty($profileData)) {
-                MemberProfile::updateOrCreate(
+                $user->memberProfile()->updateOrCreate(
                     ['user_id' => $user->id],
                     $profileData
                 );

@@ -139,7 +139,7 @@ class ServicePurchaseController extends Controller
             ], 422);
         }
 
-        // Kiểm tra chống mua chồng chéo:
+        // Kiểm tra chống mua chồng chéo: 
         // Mỗi hội viên chỉ được phép có 1 gói tập duy nhất ở trạng thái active hoặc đang chờ thanh toán.
         $existing = MemberSubscription::where('user_id', $user->id)
             ->whereIn('status', ['active', 'pending'])

@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class BusinessReport extends Model
 {
+    use \App\Traits\LogsActivity;
+
     protected $fillable = [
         'id_report',
         'date_from_summary',

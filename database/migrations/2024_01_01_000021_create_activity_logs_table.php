@@ -11,8 +11,8 @@ return new class extends Migration {
             $table->id();
             $table->unsignedBigInteger('user_id')->nullable();
             $table->string('action', 255);
-            $table->string('old_values', 255)->nullable();
-            $table->string('new_values', 255)->nullable();
+            $table->longText('old_values')->nullable();
+            $table->longText('new_values')->nullable();
             $table->string('ip_address', 45)->nullable();
             $table->timestamps();
 

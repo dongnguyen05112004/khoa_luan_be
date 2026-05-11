@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class MemberProfile extends Model
 {
+    use \App\Traits\LogsActivity;
+
     protected $fillable = [
         'user_id', 'date_of_birth', 'join_date', 'profile_picture', 'membership_type', 'emergency_contact', 'health_notes',
     ];

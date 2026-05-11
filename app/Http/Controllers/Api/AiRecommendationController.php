@@ -86,7 +86,10 @@ class AiRecommendationController extends Controller
      */
     public function generateForUser(Request $request, GroqService $groq, GeminiService $gemini): JsonResponse
     {
-        $user = $request->user()->load([
+        $userId = $request->input('user_id');
+        $user = $userId ? \App\Models\User::findOrFail($userId) : $request->user();
+        
+        $user->load([
             'memberProfile',
             'healthMetrics' => fn($q) => $q->orderBy('record_date', 'desc')->take(2),
         ]);
@@ -167,7 +170,10 @@ PROMPT;
                 'memberProfile',
                 'activeSubscription',
                 'checkins' => fn($q) => $q->where('check_in_at', '>=', now()->subMonths(3)),
-            ])->get();
+            ])
+            ->latest()
+            ->take(40) // Limit to 40 to avoid TPM (Tokens Per Minute) limit on free AI tiers
+            ->get();
 
         if ($members->isEmpty()) {
             return response()->json(['message' => 'Không có hội viên nào để phân tích.'], 404);
@@ -181,11 +187,21 @@ PROMPT;
                     false
                 );
             }
+
+            $checkins = $member->checkins;
+            $lastCheckin = $checkins->sortByDesc('check_in_at')->first();
+            $daysSinceLastCheckin = $lastCheckin ? now()->diffInDays(Carbon::parse($lastCheckin->check_in_at)) : 999;
+            
+            $checkinsThisMonth = $checkins->where('check_in_at', '>=', now()->subDays(30))->count();
+            $checkinsLastMonth = $checkins->where('check_in_at', '>=', now()->subDays(60))->where('check_in_at', '<', now()->subDays(30))->count();
+
             return [
-                'user_id'               => $member->id,
-                'checkin_last_3_months' => $member->checkins->count(),
-                'days_until_expiration' => $daysLeft,
-                'goal'                  => $member->memberProfile->health_notes ?? 'Không rõ mục tiêu',
+                'user_id'                 => $member->id,
+                'days_since_last_checkin' => $daysSinceLastCheckin,
+                'checkins_this_month'     => $checkinsThisMonth,
+                'checkins_last_month'     => $checkinsLastMonth,
+                'days_until_expiration'   => $daysLeft,
+                'goal'                    => $member->memberProfile->health_notes ?? 'Không rõ mục tiêu',
             ];
         })->values()->toArray();
 
@@ -198,13 +214,13 @@ PROMPT;
 
                 $prompt = <<<PROMPT
 Bạn là chuyên gia phân tích dữ liệu khách hàng (Churn Prediction) cho phòng Gym.
-Dưới đây là dữ liệu ẩn danh của các hội viên:
+Dưới đây là dữ liệu ẩn danh của các hội viên trong 3 tháng gần nhất:
 {$jsonInput}
 
-Phân loại mỗi hội viên theo rủi ro rời bỏ:
-- "Đỏ"   → Nguy cơ cao (ít tập, sắp/đã hết hạn)
-- "Vàng" → Cần lưu ý
-- "Xanh" → Ổn định
+Hãy đánh giá mức độ rủi ro rời bỏ và phân loại mỗi hội viên theo quy tắc SAU:
+- "Đỏ" (Nguy cơ cao): Hội viên không check-in quá 14 ngày hoặc có tần suất check-in tháng này giảm đột ngột 70% so với tháng trước. ĐỐI VỚI NHÓM NÀY: Bắt buộc đưa ra ít nhất một gợi ý hành động cụ thể (ví dụ: gửi voucher giảm giá 10% gói tập tiếp theo, hoặc nhắc nhở PT liên hệ tư vấn lại lộ trình).
+- "Vàng" (Cần lưu ý): Hội viên sắp hết hạn hợp đồng trong 7 ngày nhưng chưa có lịch hẹn gia hạn (days_until_expiration <= 7).
+- "Xanh" (An toàn): Các trường hợp còn lại.
 
 LƯU Ý: Nội dung BẮT BUỘC bằng Tiếng Việt.
 Trả về ĐÚNG định dạng MẢNG JSON sau (không kèm markdown):
@@ -213,7 +229,7 @@ Trả về ĐÚNG định dạng MẢNG JSON sau (không kèm markdown):
     "user_id": 1,
     "risk_level": "Đỏ",
     "ai_diagnosis": "Lý do...",
-    "ai_suggestions": "Hành động chăm sóc cụ thể..."
+    "ai_suggestions": "Hành động chăm sóc cụ thể (vd: Tặng voucher 10%...)..."
   }
 ]
 PROMPT;
@@ -480,7 +496,7 @@ Trả về JSON (Tiếng Việt, không markdown):
                     ->groupBy('rating')->pluck('cnt', 'rating');
                 $recentNeg = \App\Models\MemberFeedback::where('rating', '<=', 2)
                     ->where('created_at', '>=', now()->subDays(30))
-                    ->pluck('content')->take(5);
+                    ->pluck('comment')->take(5);
 
                 $payload = compact('avgRating', 'total', 'urgent', 'byRating') + [
                     'recent_negative_samples' => $recentNeg,
@@ -737,17 +753,19 @@ Trả về JSON (Tiếng Việt, không markdown):
     }
 
     /**
-     * Gọi AI theo provider cấu hình trong .env, có fallback tự động.
+     * Gọi AI theo provider cấu hình trong Database (có Cache), có fallback tự động.
      *
      * @throws \Exception
      */
     private function callAI(GroqService $groq, GeminiService $gemini, string $prompt): string
     {
-        $provider = env('AI_PROVIDER', 'groq');
+        // Lấy Provider từ Database (mặc định là groq)
+        $provider = \App\Models\SystemSetting::getValue('ai_provider', 'groq');
 
         if ($provider === 'gemini') {
             try {
-                Log::info('Calling Gemini AI (model=' . env('GEMINI_MODEL') . ')...');
+                $model = \App\Models\SystemSetting::getValue('gemini_model', 'gemini-1.5-flash');
+                Log::info("Calling Gemini AI (model={$model})...");
                 return $gemini->askAI($prompt);
             } catch (\Exception $e) {
                 Log::warning('Gemini thất bại, fallback sang Groq: ' . $e->getMessage());
@@ -756,13 +774,15 @@ Trả về JSON (Tiếng Việt, không markdown):
         }
 
         try {
-            Log::info('Calling Groq AI (model=' . env('GROQ_MODEL') . ')...');
+            $model = \App\Models\SystemSetting::getValue('groq_model', 'llama-3.3-70b-versatile');
+            Log::info("Calling Groq AI (model={$model})...");
             return $groq->askAI($prompt);
         } catch (\Exception $e) {
             Log::warning('Groq thất bại, fallback sang Gemini: ' . $e->getMessage());
             return $gemini->askAI($prompt);
         }
     }
+
 
     /**
      * Chuẩn hóa response thành công.

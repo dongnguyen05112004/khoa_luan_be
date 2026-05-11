@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class HealthMetric extends Model
 {
+    use \App\Traits\LogsActivity;
+
     protected $fillable = [
         'user_id', 'record_date', 'weight', 'height', 'body_fat_percentage', 'muscle_mass_kg', 'bmi',
     ];

@@ -15,15 +15,21 @@ class GeminiService
 
     public function __construct()
     {
-        $this->apiKey        = env('GEMINI_API_KEY', '');
-        $this->model         = env('GEMINI_MODEL', 'gemini-2.5-flash');
-        $this->fallbackModel = env('GEMINI_FALLBACK_MODEL', 'gemini-2.0-flash');
+        // Lấy từ Database (có Cache và Giải mã) thay vì file .env
+        $this->apiKey        = \App\Models\SystemSetting::getValue('gemini_api_key', '', true);
+        $this->model         = \App\Models\SystemSetting::getValue('gemini_model', 'gemini-1.5-flash');
+        $this->fallbackModel = \App\Models\SystemSetting::getValue('gemini_fallback_model', 'gemini-1.5-flash');
         $this->maxRetries    = 3;
 
         if (empty($this->apiKey)) {
-            throw new Exception('GEMINI_API_KEY chưa được cấu hình trong file .env');
+            // Fallback sang .env nếu DB chưa cấu hình (cho quá trình chuyển đổi)
+            $this->apiKey = env('GEMINI_API_KEY', '');
+            if (empty($this->apiKey)) {
+                throw new Exception('GEMINI_API_KEY chưa được cấu hình trong Hệ thống hoặc file .env');
+            }
         }
     }
+
 
     /**
      * Gửi prompt lên Google Gemini AI.

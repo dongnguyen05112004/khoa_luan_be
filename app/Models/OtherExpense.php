@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class OtherExpense extends Model
 {
+    use \App\Traits\LogsActivity;
+
     use HasFactory, SoftDeletes;
 
     protected $fillable = ['branch_id', 'created_by', 'expense_type', 'description', 'amount', 'expense_date'];
