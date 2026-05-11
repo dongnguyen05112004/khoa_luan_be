@@ -24,13 +24,14 @@ class HealthMetricController extends Controller
         $data = $request->validate([
             'user_id'             => 'required|exists:users,id',
             'record_date'         => 'required|date',
-            'weight'              => 'nullable|numeric|min:0',
-            'height'              => 'nullable|numeric|min:0',
-            'body_fat_percentage' => 'nullable|numeric|min:0|max:100',
-            'muscle_mass_kg'      => 'nullable|numeric|min:0',
-            'bmi'                 => 'nullable|numeric|min:0',
+            'weight'              => 'nullable|numeric',
+            'height'              => 'nullable|numeric',
+            'body_fat_percentage' => 'nullable|numeric',
+            'muscle_mass_kg'      => 'nullable|numeric',
         ]);
-        return response()->json(HealthMetric::create($data)->load('user'), 201);
+
+        $metric = HealthMetric::create($data);
+        return response()->json($metric->load('user'), 201);
     }
 
     /** GET /api/health-metrics/{id} */
@@ -45,14 +46,14 @@ class HealthMetricController extends Controller
         $metric = HealthMetric::findOrFail($id);
         $data = $request->validate([
             'record_date'         => 'sometimes|date',
-            'weight'              => 'nullable|numeric|min:0',
-            'height'              => 'nullable|numeric|min:0',
-            'body_fat_percentage' => 'nullable|numeric|min:0|max:100',
-            'muscle_mass_kg'      => 'nullable|numeric|min:0',
-            'bmi'                 => 'nullable|numeric|min:0',
+            'weight'              => 'nullable|numeric',
+            'height'              => 'nullable|numeric',
+            'body_fat_percentage' => 'nullable|numeric',
+            'muscle_mass_kg'      => 'nullable|numeric',
         ]);
+
         $metric->update($data);
-        return response()->json($metric);
+        return response()->json($metric->fresh());
     }
 
     /** DELETE /api/health-metrics/{id} */

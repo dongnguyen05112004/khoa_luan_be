@@ -14,6 +14,16 @@ class HealthMetric extends Model
 
     protected $casts = ['record_date' => 'date'];
 
+    protected static function booted()
+    {
+        static::saving(function ($model) {
+            if ($model->weight > 0 && $model->height > 0) {
+                $heightInMeters = $model->height / 100;
+                $model->bmi = round($model->weight / ($heightInMeters * $heightInMeters), 2);
+            }
+        });
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

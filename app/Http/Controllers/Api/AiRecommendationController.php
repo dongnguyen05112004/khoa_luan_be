@@ -91,7 +91,7 @@ class AiRecommendationController extends Controller
         
         $user->load([
             'memberProfile',
-            'healthMetrics' => fn($q) => $q->orderBy('record_date', 'desc')->take(2),
+            'healthMetrics' => fn($q) => $q->orderBy('record_date', 'desc')->orderBy('id', 'desc')->take(2),
             'checkins' => fn($q) => $q->where('check_in_at', '>=', now()->subDays(30)),
         ]);
 
@@ -125,15 +125,9 @@ class AiRecommendationController extends Controller
         $metricsText .= "\nTẦN SUẤT TẬP THỰC TẾ (30 NGÀY QUA): {$checkinCount} buổi.";
 
         $goalText       = $user->memberProfile->health_notes ?? 'Không có thông tin mục tiêu.';
-        $latestMetricId = $latest?->id ?? 'none';
         
-        // Cache thay đổi dựa trên cả số buổi checkin để luôn cập nhật lộ trình nếu đi tập nhiều/ít hơn
-        $cacheKey       = "ai_health_rec_user_{$user->id}_metric_{$latestMetricId}_chk_{$checkinCount}";
-
         try {
-            // Cache chỉ lưu array, KHÔNG lưu Eloquent model hay Response object
-            $cachedData = Cache::remember($cacheKey, now()->addHour(), function () use ($user, $groq, $gemini, $metricsText, $goalText) {
-                $prompt = <<<PROMPT
+            $prompt = <<<PROMPT
 Bạn là một huấn luyện viên AI chuyên nghiệp thiết kế lộ trình cho khách hàng PT. 
 Dựa vào dữ liệu sức khỏe, mục tiêu và lịch sử đi tập của khách hàng dưới đây, hãy phân tích và đưa ra Lộ trình luyện tập tối ưu.
 
@@ -167,14 +161,9 @@ PROMPT;
                     'is_system_created'   => true,
                 ]);
 
-                // Trả về array thuần — Cache serializes tốt hơn Eloquent model
-                return $rec->toArray();
-            });
-
-            return $this->successResponse($cachedData, 'Tạo gợi ý sức khỏe thành công');
+                return $this->successResponse($rec->toArray(), 'Tạo gợi ý sức khỏe thành công');
 
         } catch (\Exception $e) {
-            Cache::forget($cacheKey);
             return $this->errorResponse($e, 'Health & Fitness');
         }
     }
