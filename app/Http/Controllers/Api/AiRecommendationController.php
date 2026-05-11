@@ -509,7 +509,7 @@ Trả về JSON (Tiếng Việt, không markdown):
                     ->groupBy('rating')->pluck('cnt', 'rating');
                 $recentNeg = \App\Models\MemberFeedback::where('rating', '<=', 2)
                     ->where('created_at', '>=', now()->subDays(30))
-                    ->pluck('comment')->take(5);
+                    ->pluck('content')->take(5);
 
                 $payload = compact('avgRating', 'total', 'urgent', 'byRating') + [
                     'recent_negative_samples' => $recentNeg,

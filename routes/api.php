@@ -240,7 +240,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // System Settings
     Route::post('system-settings/bulk-update', [SystemSettingController::class, 'bulkUpdate']);
-    Route::apiResource('system-settings', SystemSettingController::class)->except(['index']);
+    Route::resource('system-settings', SystemSettingController::class)->except(['index']);
 
     /*==========================================================
     | MUA DỊCH VỤ (dành cho hội viên)
