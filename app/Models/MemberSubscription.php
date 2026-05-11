@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MemberSubscription extends Model
 {
+    use \App\Traits\LogsActivity;
+
     use HasFactory, SoftDeletes;
 
     protected $fillable = [

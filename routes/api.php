@@ -42,6 +42,8 @@ Route::post('/login',           [AuthController::class, 'login']);
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
 Route::post('/reset-password',  [PasswordResetController::class, 'resetPassword']);
 
+Route::get('/system-settings',  [SystemSettingController::class, 'index']);
+
 /*
 |--------------------------------------------------------------------------
 | 2. PROTECTED ROUTES (cần đăng nhập - auth:sanctum)
@@ -238,7 +240,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // System Settings
     Route::post('system-settings/bulk-update', [SystemSettingController::class, 'bulkUpdate']);
-    Route::resource('system-settings', SystemSettingController::class);
+    Route::apiResource('system-settings', SystemSettingController::class)->except(['index']);
 
     /*==========================================================
     | MUA DỊCH VỤ (dành cho hội viên)

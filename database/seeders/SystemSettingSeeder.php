@@ -13,6 +13,8 @@ class SystemSettingSeeder extends Seeder
     {
         $settings = [
             ['setting_key' => 'gym_name',          'setting_value' => 'FitLife GYM',         'setting_group' => 'general',      'description' => 'Tên phòng gym'],
+            ['setting_key' => 'gym_slogan',        'setting_value' => 'Nơi khởi nguồn sức mạnh', 'setting_group' => 'general',      'description' => 'Slogan thương hiệu'],
+            ['setting_key' => 'gym_logo',          'setting_value' => '',                    'setting_group' => 'general',      'description' => 'Logo thương hiệu'],
             ['setting_key' => 'gym_hotline',        'setting_value' => '1800-9999',            'setting_group' => 'general',      'description' => 'Số điện thoại hotline'],
             ['setting_key' => 'membership_expiry_warning_days', 'setting_value' => '7',     'setting_group' => 'notification', 'description' => 'Số ngày cảnh báo hết hạn gói tập'],
             ['setting_key' => 'max_checkin_per_day',           'setting_value' => '2',     'setting_group' => 'checkin',      'description' => 'Số lần check-in tối đa mỗi ngày'],

@@ -18,10 +18,10 @@ class ActivityLog extends Model
         return $this->belongsTo(User::class);
     }
 
-    public static function record($action, $target = null, $severity = 'info', $old = null, $new = null)
+    public static function record($action, $target = null, $severity = 'info', $old = null, $new = null, $userId = null)
     {
         self::create([
-            'user_id'     => Auth::id(),
+            'user_id'     => $userId ?? Auth::id(),
             'action'      => $action,
             'severity'    => $severity,
             'target_type' => $target ? get_class($target) : null,

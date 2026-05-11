@@ -73,6 +73,19 @@ class AuthController extends Controller
         }
 
         $user = Auth::user();
+
+        if ($user->state !== 'active') {
+            if ($request->hasSession()) {
+                Auth::guard('web')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
+
+            throw ValidationException::withMessages([
+                'email' => ['Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để biết thêm chi tiết.'],
+            ]);
+        }
+
         $user->load(['role', 'branch']);
 
         // Bản đồ role → đường dẫn UI tương ứng

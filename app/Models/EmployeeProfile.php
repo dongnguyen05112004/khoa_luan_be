@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class EmployeeProfile extends Model
 {
+    use \App\Traits\LogsActivity;
+
     protected $fillable = ['user_id', 'hire_date', 'position', 'department', 'salary'];
 
     protected $casts = ['hire_date' => 'date'];

@@ -14,13 +14,19 @@ class GroqService
 
     public function __construct()
     {
-        $this->apiKey = env('GROQ_API_KEY', '');
-        $this->model  = env('GROQ_MODEL', 'llama3-8b-8192');
+        // Lấy từ Database (có Cache và Giải mã)
+        $this->apiKey = \App\Models\SystemSetting::getValue('groq_api_key', '', true);
+        $this->model  = \App\Models\SystemSetting::getValue('groq_model', 'llama-3.3-70b-versatile');
 
         if (empty($this->apiKey)) {
-            throw new Exception('GROQ_API_KEY chưa được cấu hình trong file .env');
+            // Fallback sang .env
+            $this->apiKey = env('GROQ_API_KEY', '');
+            if (empty($this->apiKey)) {
+                throw new Exception('GROQ_API_KEY chưa được cấu hình trong Hệ thống hoặc file .env');
+            }
         }
     }
+
 
     /**
      * Gửi prompt tới Groq AI và trả về nội dung text.

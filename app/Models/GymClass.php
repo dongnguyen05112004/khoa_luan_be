@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class GymClass extends Model
 {
+    use \App\Traits\LogsActivity;
+
     use HasFactory, SoftDeletes;
 
     protected $table = 'classes';
