@@ -92,44 +92,68 @@ class AiRecommendationController extends Controller
         $user->load([
             'memberProfile',
             'healthMetrics' => fn($q) => $q->orderBy('record_date', 'desc')->take(2),
+            'checkins' => fn($q) => $q->where('check_in_at', '>=', now()->subDays(30)),
         ]);
 
-        $latest      = $user->healthMetrics->first();
+        $metrics = $user->healthMetrics;
+        $latest = $metrics->first();
+        $previous = $metrics->count() > 1 ? $metrics->last() : null;
+        $checkinCount = $user->checkins->count();
+
         $metricsText = $latest
             ? sprintf(
-                'Cân nặng: %s kg, Chiều cao: %s cm, Mỡ: %s%%, Cơ: %s%% kg, BMI: %s',
-                $latest->weight             ?? 'N/A',
-                $latest->height             ?? 'N/A',
+                'LẦN ĐO GẦN NHẤT: Cân nặng: %s kg, Chiều cao: %s cm, Mỡ: %s%%, Cơ: %s%% kg, BMI: %s',
+                $latest->weight ?? 'N/A',
+                $latest->height ?? 'N/A',
                 $latest->body_fat_percentage ?? 'N/A',
-                $latest->muscle_mass_kg     ?? 'N/A',
-                $latest->bmi               ?? 'N/A'
+                $latest->muscle_mass_kg ?? 'N/A',
+                $latest->bmi ?? 'N/A'
             )
             : 'Không có dữ liệu sức khỏe.';
 
+        if ($previous) {
+            $metricsText .= sprintf(
+                "\nLẦN ĐO TRƯỚC ĐÓ: Cân nặng: %s kg, Mỡ: %s%%, Cơ: %s%% kg",
+                $previous->weight ?? 'N/A',
+                $previous->body_fat_percentage ?? 'N/A',
+                $previous->muscle_mass_kg ?? 'N/A'
+            );
+        } else {
+            $metricsText .= "\nLẦN ĐO TRƯỚC ĐÓ: Không có dữ liệu.";
+        }
+
+        $metricsText .= "\nTẦN SUẤT TẬP THỰC TẾ (30 NGÀY QUA): {$checkinCount} buổi.";
+
         $goalText       = $user->memberProfile->health_notes ?? 'Không có thông tin mục tiêu.';
         $latestMetricId = $latest?->id ?? 'none';
-        $cacheKey       = "ai_health_rec_user_{$user->id}_metric_{$latestMetricId}";
+        
+        // Cache thay đổi dựa trên cả số buổi checkin để luôn cập nhật lộ trình nếu đi tập nhiều/ít hơn
+        $cacheKey       = "ai_health_rec_user_{$user->id}_metric_{$latestMetricId}_chk_{$checkinCount}";
 
         try {
             // Cache chỉ lưu array, KHÔNG lưu Eloquent model hay Response object
             $cachedData = Cache::remember($cacheKey, now()->addHour(), function () use ($user, $groq, $gemini, $metricsText, $goalText) {
                 $prompt = <<<PROMPT
-Bạn là một huấn luyện viên AI chuyên nghiệp. Dựa vào thông tin của khách hàng sau đây,
-hãy đưa ra 1 chẩn đoán ngắn gọn (diagnosis), 1 tiêu đề (title) cho lời khuyên,
-và 3 gạch đầu dòng các gợi ý (suggestions) để cải thiện sức khỏe/thể hình.
+Bạn là một huấn luyện viên AI chuyên nghiệp thiết kế lộ trình cho khách hàng PT. 
+Dựa vào dữ liệu sức khỏe, mục tiêu và lịch sử đi tập của khách hàng dưới đây, hãy phân tích và đưa ra Lộ trình luyện tập tối ưu.
 
-LƯU Ý: Mọi nội dung (title, ai_diagnosis, ai_suggestions) BẮT BUỘC bằng TIẾNG VIỆT.
-Trả về ĐÚNG định dạng JSON sau, không kèm markdown hay text nào khác:
+ĐẶC BIỆT LƯU Ý CÁC YÊU CẦU SAU:
+1. Phải phân tích sự thay đổi giữa "Lần đo gần nhất" và "Lần đo trước đó" (nếu có) để xem khách hàng đang tiến bộ hay thụt lùi so với mục tiêu.
+2. Từ tần suất đi tập thực tế 30 ngày qua, hãy đánh giá sự chăm chỉ và tính khả thi của lộ trình tiếp theo.
+3. Gợi ý BẮT BUỘC bao gồm 4 phần: (1) Nhận xét tình trạng (vào ai_diagnosis), (2) Nhóm cơ/Bài tập cần ưu tiên, (3) Những điều cần hạn chế/tránh, và (4) Lộ trình tập luyện 3 giai đoạn (12 tuần). Đối với các mục lưu trong ai_suggestions, BẮT BUỘC trả về ĐÚNG định dạng thẻ tag như sau (mỗi thẻ 1 dòng):
+
+Trả về ĐÚNG định dạng JSON sau, không kèm markdown hay text nào khác. CHÚ Ý: Mọi dấu xuống dòng bên trong chuỗi JSON phải dùng ký tự "\\n", KHÔNG ĐƯỢC dùng ký tự xuống dòng thực tế (ngôn ngữ: TIẾNG VIỆT):
 {
-  "title": "Tiêu đề lời khuyên",
-  "ai_diagnosis": "Chẩn đoán ngắn gọn về thể trạng hiện tại",
-  "ai_suggestions": "- Gợi ý 1\n- Gợi ý 2\n- Gợi ý 3"
+  "title": "Tiêu đề lộ trình (VD: Lộ trình siết mỡ tăng cơ 12 tuần)",
+  "ai_diagnosis": "Nhận xét tình trạng hiện tại...",
+  "ai_suggestions": "[FREQ] 4 buổi/tuần\\n[PRIORITY] Tăng cường tập thân trên (Hypertrophy)\\n[PRIORITY] Nạp đủ lượng Protein cần thiết\\n[LIMIT] Tập Cardio cường độ quá cao\\n[LIMIT] Cắt giảm thức ăn nhanh\\n[PHASE1] Thích nghi | Xây dựng nền tảng thể lực và kích hoạt hệ trao đổi chất.\\n[PHASE2] Tăng cơ | Tăng cường độ tập để tối ưu hóa phì đại cơ bắp.\\n[PHASE3] Định hình | Giảm tỷ lệ mỡ tối đa để làm rõ các khối cơ."
 }
 
 Thông tin khách hàng:
 - Giới tính: {$user->gender}
 - Mục tiêu/Ghi chú sức khỏe: {$goalText}
-- Chỉ số sức khỏe mới nhất: {$metricsText}
+- Dữ liệu chi tiết:
+{$metricsText}
 PROMPT;
 
                 $parsed = $this->callAiAndParse($groq, $gemini, $prompt, ['title', 'ai_diagnosis', 'ai_suggestions']);
@@ -713,8 +737,14 @@ Trả về JSON (Tiếng Việt, không markdown):
         $raw    = preg_replace('/```json|```/', '', $raw);
         $parsed = json_decode(trim($raw), true);
 
+        if ($parsed === null) {
+            \Illuminate\Support\Facades\Log::error("JSON Decode failed. Raw response: " . $raw);
+            throw new \Exception("AI trả về sai định dạng JSON.");
+        }
+
         foreach ($requiredKeys as $key) {
             if (!isset($parsed[$key])) {
+                \Illuminate\Support\Facades\Log::error("Missing key {$key}. Parsed JSON: " . print_r($parsed, true));
                 throw new \Exception("AI trả về thiếu trường [{$key}] trong JSON.");
             }
         }

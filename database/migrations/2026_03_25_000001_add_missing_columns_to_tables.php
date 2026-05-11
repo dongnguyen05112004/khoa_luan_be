@@ -76,54 +76,65 @@ return new class extends Migration {
     public function down(): void
     {
         Schema::table('trainers', function (Blueprint $table) {
-            $table->dropColumn(['experience', 'description']);
+            if (Schema::hasColumn('trainers', 'experience')) $table->dropColumn('experience');
+            if (Schema::hasColumn('trainers', 'description')) $table->dropColumn('description');
         });
 
         Schema::table('classes', function (Blueprint $table) {
-            $table->dropColumn('schedule_date');
+            if (Schema::hasColumn('classes', 'schedule_date')) $table->dropColumn('schedule_date');
         });
 
         Schema::table('member_feedbacks', function (Blueprint $table) {
-            $table->dropColumn(['comment', 'title']);
+            if (Schema::hasColumn('member_feedbacks', 'comment')) $table->dropColumn('comment');
+            if (Schema::hasColumn('member_feedbacks', 'title')) $table->dropColumn('title');
         });
 
         Schema::table('member_profiles', function (Blueprint $table) {
-            $table->dropColumn(['profile_picture', 'membership_type']);
+            if (Schema::hasColumn('member_profiles', 'profile_picture')) $table->dropColumn('profile_picture');
+            if (Schema::hasColumn('member_profiles', 'membership_type')) $table->dropColumn('membership_type');
         });
 
         Schema::table('employee_profiles', function (Blueprint $table) {
-            $table->dropColumn(['position', 'department']);
+            if (Schema::hasColumn('employee_profiles', 'position')) $table->dropColumn('position');
+            if (Schema::hasColumn('employee_profiles', 'department')) $table->dropColumn('department');
         });
 
         Schema::table('health_metrics', function (Blueprint $table) {
-            $table->dropColumn('bmi');
+            if (Schema::hasColumn('health_metrics', 'bmi')) $table->dropColumn('bmi');
         });
 
         Schema::table('equipment', function (Blueprint $table) {
-            $table->dropUnique(['serial_number']);
-            $table->dropColumn('serial_number');
+            if (Schema::hasColumn('equipment', 'serial_number')) {
+                // MySQL requires dropping the index before the column if they share the same name or to be safe
+                try { $table->dropUnique(['serial_number']); } catch(\Exception $e) {}
+                $table->dropColumn('serial_number');
+            }
         });
 
         Schema::table('membership_plans', function (Blueprint $table) {
-            $table->dropColumn('value');
+            if (Schema::hasColumn('membership_plans', 'value')) $table->dropColumn('value');
         });
 
         Schema::table('promotions', function (Blueprint $table) {
-            $table->dropUnique(['code']);
-            $table->dropColumn('code');
+            if (Schema::hasColumn('promotions', 'code')) {
+                try { $table->dropUnique(['code']); } catch(\Exception $e) {}
+                $table->dropColumn('code');
+            }
         });
 
         Schema::table('payments', function (Blueprint $table) {
-            $table->dropColumn('payment_confirmed');
+            if (Schema::hasColumn('payments', 'payment_confirmed')) $table->dropColumn('payment_confirmed');
         });
 
         Schema::table('pt_contracts', function (Blueprint $table) {
-            $table->dropForeign(['branch_id']);
-            $table->dropColumn('branch_id');
+            if (Schema::hasColumn('pt_contracts', 'branch_id')) {
+                try { $table->dropForeign(['branch_id']); } catch(\Exception $e) {}
+                $table->dropColumn('branch_id');
+            }
         });
 
         Schema::table('checkins', function (Blueprint $table) {
-            $table->dropColumn('notes');
+            if (Schema::hasColumn('checkins', 'notes')) $table->dropColumn('notes');
         });
     }
 };

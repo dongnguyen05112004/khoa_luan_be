@@ -24,7 +24,11 @@ return new class extends Migration {
 
     public function down(): void
     {
-        // Rollback: xóa 'pending' (các bản ghi pending sẽ bị lỗi nếu còn tồn tại)
+        // Chuyển các bản ghi đang là 'pending' sang 'cancelled' trước khi xóa enum 'pending'
+        DB::table('member_subscriptions')->where('status', 'pending')->update(['status' => 'cancelled']);
+        DB::table('pt_contracts')->where('status', 'pending')->update(['status' => 'cancelled']);
+
+        // Rollback: xóa 'pending' khỏi định nghĩa ENUM
         DB::statement("ALTER TABLE member_subscriptions MODIFY COLUMN status ENUM('active','expired','cancelled') NOT NULL DEFAULT 'active'");
         DB::statement("ALTER TABLE pt_contracts MODIFY COLUMN status ENUM('active','completed','cancelled') NOT NULL DEFAULT 'active'");
     }
