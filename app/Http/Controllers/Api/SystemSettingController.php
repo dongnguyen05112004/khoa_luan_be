@@ -137,6 +137,18 @@ class SystemSettingController extends Controller
         return response()->json($setting);
     }
 
+    /** POST /api/system-settings */
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'setting_key'   => 'required|string|max:100|unique:system_settings',
+            'setting_value' => 'nullable|string',
+            'setting_group' => 'nullable|string|max:100',
+            'description'   => 'nullable|string',
+        ]);
+        return response()->json(SystemSetting::create($data), 201);
+    }
+
 
     /** PUT /api/system-settings/{id} */
     public function update(Request $request, $id)

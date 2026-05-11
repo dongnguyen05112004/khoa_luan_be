@@ -16,7 +16,7 @@ class GroqService
     {
         // Lấy từ Database (có Cache và Giải mã)
         $this->apiKey = \App\Models\SystemSetting::getValue('groq_api_key', '', true);
-        $this->model  = \App\Models\SystemSetting::getValue('groq_model', 'llama-3.3-70b-versatile');
+        $this->model  = \App\Models\SystemSetting::getValue('groq_model', 'llama3-8b-8192');
 
         if (empty($this->apiKey)) {
             // Fallback sang .env

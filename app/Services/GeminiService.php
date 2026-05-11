@@ -17,8 +17,8 @@ class GeminiService
     {
         // Lấy từ Database (có Cache và Giải mã) thay vì file .env
         $this->apiKey        = \App\Models\SystemSetting::getValue('gemini_api_key', '', true);
-        $this->model         = \App\Models\SystemSetting::getValue('gemini_model', 'gemini-1.5-flash');
-        $this->fallbackModel = \App\Models\SystemSetting::getValue('gemini_fallback_model', 'gemini-1.5-flash');
+        $this->model         = \App\Models\SystemSetting::getValue('gemini_model', 'gemini-2.5-flash');
+        $this->fallbackModel = \App\Models\SystemSetting::getValue('gemini_fallback_model', 'gemini-2.0-flash');
         $this->maxRetries    = 3;
 
         if (empty($this->apiKey)) {
