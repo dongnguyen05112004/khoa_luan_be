@@ -58,22 +58,30 @@ class PaymentController extends Controller
         $status = $statusMap[$p->status] ?? ['label' => $p->status, 'class' => 'st-pending'];
 
         // Tên gói tập
-        $packageLabel = $plan?->plan_name ?? 'Không xác định';
-        $pkgClassMap  = [
-            'Elite'   => 'pkg-elite',
-            'Monthly' => 'pkg-monthly',
-            'PT'      => 'pkg-pt',
-        ];
-        $pkgClass = 'pkg-monthly';
-        foreach ($pkgClassMap as $keyword => $cls) {
-            if (stripos($packageLabel, $keyword) !== false) {
-                $pkgClass = $cls;
-                break;
-            }
-        }
-        // Đặc biệt cho PT contract (nếu payable_type là PtContract)
+        $packageLabel = $plan?->plan_name;
+
+        // Nếu là PT contract (payable_type là PtContract)
         if ($p->payable_type === \App\Models\PtContract::class) {
+            $contract = \App\Models\PtContract::with('trainer.user')->find($p->payable_id);
+            if ($contract) {
+                $trainerName = $contract->trainer?->user?->full_name ?? $contract->trainer?->user?->name ?? 'HLV';
+                $packageLabel = "Thuê PT: " . $trainerName . " (" . $contract->total_sessions . " buổi)";
+            }
             $pkgClass = 'pkg-pt';
+        } else {
+            $packageLabel = $packageLabel ?? 'Không xác định';
+            $pkgClassMap  = [
+                'Elite'   => 'pkg-elite',
+                'Monthly' => 'pkg-monthly',
+                'PT'      => 'pkg-pt',
+            ];
+            $pkgClass = 'pkg-monthly';
+            foreach ($pkgClassMap as $keyword => $cls) {
+                if (stripos($packageLabel, $keyword) !== false) {
+                    $pkgClass = $cls;
+                    break;
+                }
+            }
         }
 
         return [
@@ -131,12 +139,19 @@ class PaymentController extends Controller
     public function index(Request $request)
     {
         $payments = Payment::with(['user', 'subscription.plan', 'promotion'])
+            // Quy tắc: Chỉ hiển thị các giao dịch đã được khách xác nhận thanh toán (nếu đang pending) 
+            // để tránh rác cho bộ phận kế toán/lễ tân.
+            ->where(function($q) {
+                $q->where('status', '!=', 'pending')
+                  ->orWhere('payment_confirmed', true);
+            })
             ->when($request->user_id, fn($q) => $q->where('user_id', $request->user_id))
             ->when(
                 $request->status && $request->status !== 'all',
                 fn($q) => $q->where('status', $request->status)
             )
             ->when($request->input('method'), fn($q) => $q->where('payment_method', $request->input('method')))
+            ->when($request->has('payment_confirmed'), fn($q) => $q->where('payment_confirmed', $request->input('payment_confirmed')))
             ->when($request->date_from, fn($q) => $q->whereDate('payment_date', '>=', $request->date_from))
             ->when($request->date_to,   fn($q) => $q->whereDate('payment_date', '<=', $request->date_to))
             ->when($request->search, function ($q) use ($request) {
@@ -151,7 +166,7 @@ class PaymentController extends Controller
                           });
                 });
             })
-            ->latest('payment_date')
+            ->latest('id')
             ->paginate($request->per_page ?? 20);
 
         $payments->getCollection()->transform(fn($p) => $this->formatPayment($p));
