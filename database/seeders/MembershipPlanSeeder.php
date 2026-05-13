@@ -3,65 +3,105 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\MembershipPlan;
+use Illuminate\Support\Facades\DB;
 
+/**
+ * MembershipPlanSeeder - Các gói tập phổ biến tại phòng gym Việt Nam
+ * Cột: id, plan_name, duration_days, price, value, description, status, created_at, updated_at
+ */
 class MembershipPlanSeeder extends Seeder
 {
     public function run(): void
     {
         $plans = [
+            // --- GÓI THỬ NGHIỆM / NGẮN HẠN ---
             [
-                'plan_name'     => 'Gói 1 Tháng Cơ Bản',
-                'duration_days' => 30,
-                'price'         => 500000,
-                'value'         => 600000,
-                'description'   => 'Tập tự do, không kèm PT, không tính lớp học nhóm',
-                'status'        => 'active',
+                'id'           => 1,
+                'plan_name'    => 'Gói 1 Tháng',
+                'duration_days'=> 30,
+                'price'        => 500000.00,
+                'value'        => 500000.00,
+                'description'  => 'Gói tập cơ bản 1 tháng. Truy cập tất cả khu vực tập luyện, phòng cardio, phòng gym. Giờ mở cửa 5:00 - 22:00.',
+                'status'       => 'active',
+                'created_at'   => '2025-09-01 08:00:00',
+                'updated_at'   => '2025-09-01 08:00:00',
             ],
+            // --- GÓI PHỔ BIẾN ---
             [
-                'plan_name'     => 'Gói 3 Tháng Tiêu Chuẩn',
-                'duration_days' => 90,
-                'price'         => 1200000,
-                'value'         => 1500000,
-                'description'   => 'Tập tự do + tham gia 4 lớp học nhóm/tháng',
-                'status'        => 'active',
+                'id'           => 2,
+                'plan_name'    => 'Gói 3 Tháng',
+                'duration_days'=> 90,
+                'price'        => 1300000.00,
+                'value'        => 1500000.00,
+                'description'  => 'Gói 3 tháng tiết kiệm hơn 13%. Bao gồm truy cập toàn bộ cơ sở, lớp học nhóm cơ bản miễn phí.',
+                'status'       => 'active',
+                'created_at'   => '2025-09-01 08:00:00',
+                'updated_at'   => '2025-09-01 08:00:00',
             ],
+            // --- GÓI TIẾT KIỆM ---
             [
-                'plan_name'     => 'Gói 6 Tháng Nâng Cao',
-                'duration_days' => 180,
-                'price'         => 2000000,
-                'value'         => 2800000,
-                'description'   => 'Tập tự do + lớp học nhóm không giới hạn',
-                'status'        => 'active',
+                'id'           => 3,
+                'plan_name'    => 'Gói 6 Tháng',
+                'duration_days'=> 180,
+                'price'        => 2400000.00,
+                'value'        => 3000000.00,
+                'description'  => 'Gói 6 tháng tiết kiệm 20%. Bao gồm toàn bộ quyền lợi cơ bản + 2 buổi tư vấn dinh dưỡng miễn phí.',
+                'status'       => 'active',
+                'created_at'   => '2025-09-01 08:00:00',
+                'updated_at'   => '2025-09-01 08:00:00',
             ],
+            // --- GÓI VIP ---
             [
-                'plan_name'     => 'Gói 12 Tháng VIP',
-                'duration_days' => 365,
-                'price'         => 3500000,
-                'value'         => 5000000,
-                'description'   => 'Tập tự do + lớp học nhóm + 2 buổi PT/tháng + locker',
-                'status'        => 'active',
+                'id'           => 4,
+                'plan_name'    => 'Gói 1 Năm (VIP)',
+                'duration_days'=> 365,
+                'price'        => 4200000.00,
+                'value'        => 6000000.00,
+                'description'  => 'Gói năm VIP tiết kiệm 30%. Truy cập toàn bộ cơ sở + lớp học nhóm không giới hạn + 1 buổi PT/tháng.',
+                'status'       => 'active',
+                'created_at'   => '2025-09-01 08:00:00',
+                'updated_at'   => '2025-09-01 08:00:00',
             ],
+            // --- GÓI PREMIUM (Tất cả chi nhánh) ---
             [
-                'plan_name'     => 'Gói PT 10 Buổi',
-                'duration_days' => 60,
-                'price'         => 3000000,
-                'value'         => 3000000,
-                'description'   => 'Gói huấn luyện cá nhân 10 buổi với PT chuyên nghiệp',
-                'status'        => 'active',
+                'id'           => 5,
+                'plan_name'    => 'Gói Đa Chi Nhánh 3 Tháng',
+                'duration_days'=> 90,
+                'price'        => 1800000.00,
+                'value'        => 2100000.00,
+                'description'  => 'Gói 3 tháng có thể tập tại tất cả 3 chi nhánh FitLife. Phù hợp cho hội viên thường xuyên di chuyển.',
+                'status'       => 'active',
+                'created_at'   => '2025-10-01 08:00:00',
+                'updated_at'   => '2025-10-01 08:00:00',
             ],
+            // --- GÓI SINH VIÊN ---
             [
-                'plan_name'     => 'Gói PT 20 Buổi',
-                'duration_days' => 90,
-                'price'         => 5500000,
-                'value'         => 7000000,
-                'description'   => 'Gói huấn luyện cá nhân 20 buổi, có lộ trình tập tùy chỉnh',
-                'status'        => 'active',
+                'id'           => 6,
+                'plan_name'    => 'Gói Sinh Viên 3 Tháng',
+                'duration_days'=> 90,
+                'price'        => 950000.00,
+                'value'        => 1300000.00,
+                'description'  => 'Ưu đãi đặc biệt dành cho sinh viên (cần thẻ SV). Giờ tập 8:00-16:00 các ngày trong tuần.',
+                'status'       => 'active',
+                'created_at'   => '2025-10-15 08:00:00',
+                'updated_at'   => '2025-10-15 08:00:00',
+            ],
+            // --- GÓI NGỪNG BÁN (inactive) ---
+            [
+                'id'           => 7,
+                'plan_name'    => 'Gói Combo PT + Phòng Gym 1 Tháng',
+                'duration_days'=> 30,
+                'price'        => 2500000.00,
+                'value'        => 3200000.00,
+                'description'  => 'Gói cũ bao gồm 8 buổi PT + quyền dùng phòng gym. Đã ngưng bán từ 03/2026 (thay bằng hợp đồng PT riêng).',
+                'status'       => 'inactive',
+                'created_at'   => '2025-09-01 08:00:00',
+                'updated_at'   => '2026-03-01 10:00:00',
             ],
         ];
 
         foreach ($plans as $plan) {
-            MembershipPlan::firstOrCreate(['plan_name' => $plan['plan_name']], $plan);
+            DB::table('membership_plans')->updateOrInsert(['id' => $plan['id']], $plan);
         }
     }
 }

@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Branch;
+use Illuminate\Support\Facades\DB;
 
 class BranchSeeder extends Seeder
 {
@@ -11,33 +11,36 @@ class BranchSeeder extends Seeder
     {
         $branches = [
             [
-                'branch_name' => 'Chi nhánh Quận 1',
-                'address'     => '123 Nguyễn Huệ, Quận 1, TP.HCM',
-                'phone'       => '028-3823-1234',
+                'id'          => 1,
+                'branch_name' => 'FitLife GYM - Quận 1',
+                'address'     => '123 Lê Lợi, Phường Bến Thành, Quận 1, TP.HCM',
+                'phone'       => '02838221100',
                 'capacity'    => 200,
+                'created_at'  => '2025-09-01 08:00:00',
+                'updated_at'  => '2025-09-01 08:00:00',
             ],
             [
-                'branch_name' => 'Chi nhánh Quận 3',
-                'address'     => '45 Lê Văn Sỹ, Quận 3, TP.HCM',
-                'phone'       => '028-3832-5678',
+                'id'          => 2,
+                'branch_name' => 'FitLife GYM - Bình Thạnh',
+                'address'     => '56 Đinh Tiên Hoàng, Phường 3, Quận Bình Thạnh, TP.HCM',
+                'phone'       => '02835123456',
                 'capacity'    => 150,
+                'created_at'  => '2025-09-15 08:00:00',
+                'updated_at'  => '2025-09-15 08:00:00',
             ],
             [
-                'branch_name' => 'Chi nhánh Bình Thạnh',
-                'address'     => '78 Đinh Bộ Lĩnh, Bình Thạnh, TP.HCM',
-                'phone'       => '028-3511-9012',
-                'capacity'    => 180,
-            ],
-            [
-                'branch_name' => 'Chi nhánh Gò Vấp',
-                'address'     => '99 Quang Trung, Gò Vấp, TP.HCM',
-                'phone'       => '028-3995-3456',
+                'id'          => 3,
+                'branch_name' => 'FitLife GYM - Gò Vấp',
+                'address'     => '88 Quang Trung, Phường 10, Quận Gò Vấp, TP.HCM',
+                'phone'       => '02836987654',
                 'capacity'    => 120,
+                'created_at'  => '2025-10-01 08:00:00',
+                'updated_at'  => '2025-10-01 08:00:00',
             ],
         ];
 
-        foreach ($branches as $b) {
-            Branch::firstOrCreate(['branch_name' => $b['branch_name']], $b);
+        foreach ($branches as $branch) {
+            DB::table('branches')->updateOrInsert(['id' => $branch['id']], $branch);
         }
     }
 }

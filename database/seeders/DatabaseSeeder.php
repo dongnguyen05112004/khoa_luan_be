@@ -4,16 +4,19 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 
+/**
+ * DatabaseSeeder - Entry point chạy tất cả seeders
+ * Thứ tự theo phụ thuộc khóa ngoại (bảng cha trước, bảng con sau)
+ *
+ * Dữ liệu trải dài từ 10/2025 đến 05/2026 (7 tháng)
+ * Tác nhân: 1 admin | 3 manager | 5 staff (lễ tân) | 6 PT | 80 member | 15 guest
+ */
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     * Thứ tự theo phụ thuộc khóa ngoại (bảng cha trước, bảng con sau)
-     */
     public function run(): void
     {
         $this->call([
-            // 1. Bảng độc lập (không phụ thuộc bảng khác)
+            // 1. Bảng độc lập
             RoleSeeder::class,
             BranchSeeder::class,
             PromotionSeeder::class,
@@ -41,15 +44,19 @@ class DatabaseSeeder extends Seeder
             // 8. Check-ins (phụ thuộc: users, branches)
             CheckinSeeder::class,
 
-            // 9. PT (phụ thuộc: users, trainers)
+            // 8b. Hội viên nguy cơ rời bỏ (bổ sung check-in, subscription, health)
+            ChurnRiskMemberSeeder::class,
+
+            // 9. PT Contracts & Bookings (phụ thuộc: users, trainers)
             PtContractSeeder::class,
             PtBookingSeeder::class,
 
             // 10. Payments (phụ thuộc: users, member_subscriptions, promotions)
             PaymentSeeder::class,
 
-            // 11. Equipment + maintenance (phụ thuộc: branches, users)
+            // 11. Equipment + Maintenance (phụ thuộc: branches, users)
             EquipmentSeeder::class,
+            PtPhiTinSeeder::class, // <- Equipment Maintenance records
 
             // 12. Other Expenses (phụ thuộc: branches, users)
             OtherExpenseSeeder::class,
@@ -69,6 +76,9 @@ class DatabaseSeeder extends Seeder
 
             // 17. Activity Logs (phụ thuộc: users)
             ActivityLogSeeder::class,
+
+            // 18. Bổ sung: health_metrics đầy đủ + PT contracts 3-4/PT
+            SupplementSeeder::class,
         ]);
     }
 }

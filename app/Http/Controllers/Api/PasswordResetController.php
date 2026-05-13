@@ -29,11 +29,11 @@ class PasswordResetController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        // Luôn trả 200 để tránh lộ thông tin tài khoản tồn tại hay không
         if (!$user) {
             return response()->json([
-                'message' => 'Nếu email tồn tại trong hệ thống, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.',
-            ]);
+                'status'  => false,
+                'message' => 'Email không tồn tại trong hệ thống.',
+            ], 404);
         }
 
         // Tạo token ngẫu nhiên 64 ký tự

@@ -30,7 +30,15 @@ class HealthMetricController extends Controller
             'muscle_mass_kg'      => 'nullable|numeric',
         ]);
 
-        $metric = HealthMetric::create($data);
+        // Sử dụng updateOrCreate để nếu PT nhập tiếp cho cùng 1 ngày thì nó sẽ tự động cập nhật bản ghi cũ
+        $metric = HealthMetric::updateOrCreate(
+            [
+                'user_id'     => $data['user_id'],
+                'record_date' => $data['record_date']
+            ],
+            $data
+        );
+
         return response()->json($metric->load('user'), 201);
     }
 
