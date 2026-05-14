@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Checkin;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class CheckinController extends Controller
 {
@@ -18,6 +19,39 @@ class CheckinController extends Controller
             ->latest('check_in_at')
             ->paginate($request->per_page ?? 20);
         return response()->json($checkins);
+    }
+
+    /**
+     * GET /api/checkins/my
+     * Lấy lịch sử check-in của hội viên đang đăng nhập
+     */
+    public function myCheckins(Request $request)
+    {
+        $user = $request->user();
+
+        $checkins = Checkin::with(['branch'])
+            ->where('user_id', $user->id)
+            ->when($request->date, fn($q) => $q->whereDate('check_in_at', $request->date))
+            ->latest('check_in_at')
+            ->paginate($request->per_page ?? 30);
+
+        // Thống kê nhanh
+        $now = Carbon::now();
+        $todayCount = Checkin::where('user_id', $user->id)
+            ->whereDate('check_in_at', $now->toDateString())->count();
+        $weekCount = Checkin::where('user_id', $user->id)
+            ->whereBetween('check_in_at', [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()])->count();
+        $monthCount = Checkin::where('user_id', $user->id)
+            ->whereBetween('check_in_at', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()])->count();
+        $totalCount = Checkin::where('user_id', $user->id)->count();
+
+        return response()->json([
+            'checkins'    => $checkins,
+            'today_count' => $todayCount,
+            'week_count'  => $weekCount,
+            'month_count' => $monthCount,
+            'total_count' => $totalCount,
+        ]);
     }
 
     /** POST /api/checkins */

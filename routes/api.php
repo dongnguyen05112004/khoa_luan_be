@@ -152,7 +152,8 @@ Route::middleware('auth:sanctum')->group(function () {
     | 6. CHECK-IN & THEO DÕI HOẠT ĐỘNG
     ==========================================================*/
 
-    // Checkins
+    // Checkins – phải đặt /my TRƯỚC resource để không bị bắt nhầm bởi {id}
+    Route::get('/checkins/my', [CheckinController::class, 'myCheckins']);
     Route::resource('checkins', CheckinController::class);
 
     // Health Metrics (Chỉ số sức khỏe)
