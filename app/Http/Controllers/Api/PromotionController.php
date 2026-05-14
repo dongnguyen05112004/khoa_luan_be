@@ -72,6 +72,62 @@ class PromotionController extends Controller
         return response()->json($promotion);
     }
 
+    /**
+     * GET /api/promotions/check?code=...
+     * Kiểm tra mã khuyến mãi theo code, trả về trạng thái hợp lệ và % giảm giá.
+     * Response: { is_valid: bool, id, discount, title, message }
+     */
+    public function checkByCode(Request $request)
+    {
+        $code = trim($request->query('code', ''));
+
+        if (!$code) {
+            return response()->json([
+                'is_valid' => false,
+                'message'  => 'Vui lòng nhập mã khuyến mãi.',
+            ], 422);
+        }
+
+        $promo = Promotion::where('code', $code)->first();
+
+        if (!$promo) {
+            return response()->json([
+                'is_valid' => false,
+                'message'  => 'Mã khuyến mãi không tồn tại.',
+            ]);
+        }
+
+        // Dùng accessor getIsValidAttribute() đã có sẵn trong Model
+        if (!$promo->is_valid) {
+            $now    = now();
+            $reason = '';
+            if (!$promo->is_active) {
+                $reason = 'Mã khuyến mãi đã bị vô hiệu hoá.';
+            } elseif ($now->lt($promo->start_date)) {
+                $reason = 'Mã khuyến mãi chưa đến ngày áp dụng.';
+            } elseif ($now->gt($promo->end_date)) {
+                $reason = 'Mã khuyến mãi đã hết hạn.';
+            } elseif ($promo->current_usage >= $promo->usage_limit) {
+                $reason = 'Mã khuyến mãi đã hết lượt sử dụng.';
+            } else {
+                $reason = 'Mã khuyến mãi không hợp lệ hoặc đã hết hạn.';
+            }
+
+            return response()->json([
+                'is_valid' => false,
+                'message'  => $reason,
+            ]);
+        }
+
+        return response()->json([
+            'is_valid' => true,
+            'id'       => $promo->id,
+            'discount' => (float) $promo->discount,
+            'title'    => $promo->title,
+            'message'  => "Áp dụng thành công! Giảm {$promo->discount}%",
+        ]);
+    }
+
     /** DELETE /api/promotions/{id} */
     public function destroy($id)
     {

@@ -121,6 +121,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Promotions (Khuyến mãi)
     Route::get('/promotions/active', [PromotionController::class, 'activeOnly']); // Khuyến mãi còn hiệu lực
+    Route::get('/promotions/check',  [PromotionController::class, 'checkByCode']); // Kiểm tra mã KM theo code
     Route::resource('promotions', PromotionController::class);
 
     /*==========================================================
