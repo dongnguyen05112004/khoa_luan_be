@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AiRecommendationController;
 use App\Http\Controllers\Api\BusinessReportController;
 use App\Http\Controllers\Api\SystemSettingController;
+use App\Http\Controllers\Api\PromotionAnalysisController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\ServicePurchaseController;
@@ -225,6 +226,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('manager/retention-analysis', [AiRecommendationController::class, 'retentionAnalysis']);
     Route::post('manager/plan-effectiveness', [AiRecommendationController::class, 'planEffectiveness']);
     Route::post('manager/promotion-effectiveness', [AiRecommendationController::class, 'promotionEffectiveness']);
+    Route::post('manager/promotion-analysis', [PromotionAnalysisController::class, 'analyze']);
     Route::post('manager/feedback-analysis', [AiRecommendationController::class, 'feedbackAnalysis']);
     Route::post('manager/general-report', [AiRecommendationController::class, 'generalReport']);
     Route::post('manager/health-churn-report', [AiRecommendationController::class, 'healthChurnReport']);
