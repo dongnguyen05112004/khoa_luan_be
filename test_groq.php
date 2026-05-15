@@ -4,12 +4,12 @@ $app = require_once __DIR__ . '/bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
-use App\Services\GeminiService;
+use App\Services\GroqService;
 
 try {
-    $gemini = new GeminiService();
-    echo "Testing Gemini with model: gemini-1.5-flash\n";
-    $response = $gemini->askAI("Say hello in 1 word");
+    $groq = new GroqService();
+    echo "Testing Groq with model: llama-3.3-70b-versatile\n";
+    $response = $groq->askAI("Say hello in 1 word");
     echo "Response: " . $response . "\n";
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";

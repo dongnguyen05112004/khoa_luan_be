@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class ActivityLogController extends Controller
@@ -34,10 +35,10 @@ class ActivityLogController extends Controller
 
         // Lọc theo khoảng ngày
         $query->when($request->filled('date_from'), function ($q) use ($request) {
-            $q->whereDate('created_at', '>=', $request->date_from);
+            $q->where('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         });
         $query->when($request->filled('date_to'), function ($q) use ($request) {
-            $q->whereDate('created_at', '<=', $request->date_to);
+            $q->where('created_at', '<', Carbon::parse($request->date_to)->addDay()->startOfDay());
         });
 
         // Lấy danh sách phân trang
@@ -48,7 +49,7 @@ class ActivityLogController extends Controller
             $today = \Carbon\Carbon::today();
             $customResponse = $paginator->toArray();
             $customResponse['stats'] = [
-                'total_today' => ActivityLog::whereDate('created_at', $today)->count(),
+                'total_today' => ActivityLog::where('created_at', '>=', $today)->where('created_at', '<', $today->copy()->addDay())->count(),
                 'high_severity' => ActivityLog::where('action', 'like', '%delete%')
                                               ->orWhere('action', 'like', '%destroy%')->count(),
             ];

@@ -28,7 +28,10 @@ class OtherExpense extends Model
     // Lọc chi phí theo tháng và năm
     public function scopeMonthly($query, $month, $year)
     {
-        return $query->whereMonth('expense_date', $month)
-                    ->whereYear('expense_date', $year);
+        $from = \Carbon\Carbon::create((int) $year, (int) $month, 1);
+        $to = $from->copy()->addMonth();
+
+        return $query->where('expense_date', '>=', $from->toDateString())
+                    ->where('expense_date', '<', $to->toDateString());
     }
 }

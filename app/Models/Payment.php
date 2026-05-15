@@ -13,7 +13,7 @@ class Payment extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'invoice_number', 'user_id', 'subscription_id', 'payable_id', 'payable_type',
+        'invoice_number', 'user_id', 'branch_id', 'subscription_id', 'payable_id', 'payable_type',
         'amount', 'payment_date', 'payment_method', 'status', 'payment_confirmed', 'promotion_id', 'note',
     ];
 
@@ -22,6 +22,11 @@ class Payment extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function subscription()
@@ -49,6 +54,7 @@ class Payment extends Model
     public function scopeRevenueBetween($query, $from, $to)
     {
         return $query->where('status', 'paid')
-                    ->whereBetween('payment_date', [$from, $to]);
+                    ->where('payment_date', '>=', $from)
+                    ->where('payment_date', '<', $to);
     }
 }

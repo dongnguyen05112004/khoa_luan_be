@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\MemberSubscription;
 use App\Models\Promotion;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 // DB facade không dùng trong file này (đã remove để tránh warning)
@@ -92,6 +93,8 @@ class PaymentController extends Controller
                                     ? Carbon::parse($p->payment_date)->format('M d, Y')
                                     : Carbon::parse($p->created_at)->format('M d, Y'),
             'payment_date'   => $p->payment_date?->toDateString(),
+            'branch_id'      => $p->branch_id,
+            'branch_name'    => $p->branch?->branch_name,
             // Hội viên
             'user_id'        => $p->user_id,
             'memberName'     => $user?->full_name ?? $user?->name ?? 'Không rõ',
@@ -138,13 +141,14 @@ class PaymentController extends Controller
     ==========================================================================*/
     public function index(Request $request)
     {
-        $payments = Payment::with(['user', 'subscription.plan', 'promotion'])
+        $payments = Payment::with(['user', 'branch', 'subscription.plan', 'promotion'])
             // Quy tắc: Chỉ hiển thị các giao dịch đã được khách xác nhận thanh toán (nếu đang pending) 
             // để tránh rác cho bộ phận kế toán/lễ tân.
             ->where(function($q) {
                 $q->where('status', '!=', 'pending')
                   ->orWhere('payment_confirmed', true);
             })
+            ->when($request->branch_id, fn($q) => $q->where('branch_id', $request->branch_id))
             ->when($request->user_id, fn($q) => $q->where('user_id', $request->user_id))
             ->when(
                 $request->status && $request->status !== 'all',
@@ -152,8 +156,8 @@ class PaymentController extends Controller
             )
             ->when($request->input('method'), fn($q) => $q->where('payment_method', $request->input('method')))
             ->when($request->has('payment_confirmed'), fn($q) => $q->where('payment_confirmed', $request->input('payment_confirmed')))
-            ->when($request->date_from, fn($q) => $q->whereDate('payment_date', '>=', $request->date_from))
-            ->when($request->date_to,   fn($q) => $q->whereDate('payment_date', '<=', $request->date_to))
+            ->when($request->date_from, fn($q) => $q->where('payment_date', '>=', $request->date_from))
+            ->when($request->date_to, fn($q) => $q->where('payment_date', '<', Carbon::parse($request->date_to)->addDay()->toDateString()))
             ->when($request->search, function ($q) use ($request) {
                 $s = $request->search;
                 $q->where(function ($inner) use ($s) {
@@ -190,17 +194,25 @@ class PaymentController extends Controller
     ==========================================================================*/
     public function stats(Request $request)
     {
-        $today     = Carbon::today();
-        $yesterday = Carbon::yesterday();
+        $today          = Carbon::today();
+        $tomorrow       = $today->copy()->addDay();
+        $yesterday      = Carbon::yesterday();
+        $monthStart     = $today->copy()->startOfMonth();
+        $nextMonthStart = $monthStart->copy()->addMonth();
+
+        $paidBase = Payment::where('status', 'paid')
+            ->when($request->branch_id, fn($q) => $q->where('branch_id', $request->branch_id));
 
         // Doanh thu hôm nay
-        $todayRevenue = Payment::where('status', 'paid')
-            ->whereDate('payment_date', $today)
+        $todayRevenue = (clone $paidBase)
+            ->where('payment_date', '>=', $today->toDateString())
+            ->where('payment_date', '<', $tomorrow->toDateString())
             ->sum('amount');
 
         // Doanh thu hôm qua (để tính % thay đổi)
-        $yesterdayRevenue = Payment::where('status', 'paid')
-            ->whereDate('payment_date', $yesterday)
+        $yesterdayRevenue = (clone $paidBase)
+            ->where('payment_date', '>=', $yesterday->toDateString())
+            ->where('payment_date', '<', $today->toDateString())
             ->sum('amount');
 
         $revenueChange = $yesterdayRevenue > 0
@@ -208,15 +220,20 @@ class PaymentController extends Controller
             : 0;
 
         // Số giao dịch hôm nay
-        $completedCount = Payment::where('status', 'paid')
-            ->whereDate('payment_date', $today)
+        $completedCount = (clone $paidBase)
+            ->where('payment_date', '>=', $today->toDateString())
+            ->where('payment_date', '<', $tomorrow->toDateString())
             ->count();
 
         $refundedCount = Payment::where('status', 'refunded')
-            ->whereDate('payment_date', $today)
+            ->when($request->branch_id, fn($q) => $q->where('branch_id', $request->branch_id))
+            ->where('payment_date', '>=', $today->toDateString())
+            ->where('payment_date', '<', $tomorrow->toDateString())
             ->count();
 
-        $pendingCount = Payment::where('status', 'pending')->count();
+        $pendingCount = Payment::where('status', 'pending')
+            ->when($request->branch_id, fn($q) => $q->where('branch_id', $request->branch_id))
+            ->count();
 
         // Giá trị trung bình mỗi giao dịch
         $avgTicket = $completedCount > 0
@@ -224,15 +241,15 @@ class PaymentController extends Controller
             : 0;
 
         // Doanh thu tháng này
-        $monthRevenue = Payment::where('status', 'paid')
-            ->whereYear('payment_date', $today->year)
-            ->whereMonth('payment_date', $today->month)
+        $monthRevenue = (clone $paidBase)
+            ->where('payment_date', '>=', $monthStart->toDateString())
+            ->where('payment_date', '<', $nextMonthStart->toDateString())
             ->sum('amount');
 
         // Thống kê theo phương thức thanh toán (tháng này)
-        $methodStats = Payment::where('status', 'paid')
-            ->whereYear('payment_date', $today->year)
-            ->whereMonth('payment_date', $today->month)
+        $methodStats = (clone $paidBase)
+            ->where('payment_date', '>=', $monthStart->toDateString())
+            ->where('payment_date', '<', $nextMonthStart->toDateString())
             ->selectRaw('payment_method, COUNT(*) as count, SUM(amount) as total')
             ->groupBy('payment_method')
             ->get();
@@ -287,7 +304,9 @@ class PaymentController extends Controller
         if ($period === 'month') {
             $year = $request->year ?? Carbon::today()->year;
             $data = Payment::where('status', 'paid')
-                ->whereYear('payment_date', $year)
+                ->when($request->branch_id, fn($q) => $q->where('branch_id', $request->branch_id))
+                ->where('payment_date', '>=', Carbon::create((int) $year, 1, 1)->toDateString())
+                ->where('payment_date', '<', Carbon::create((int) $year + 1, 1, 1)->toDateString())
                 ->selectRaw('MONTH(payment_date) as month, SUM(amount) as total, COUNT(*) as count')
                 ->groupByRaw('MONTH(payment_date)')
                 ->orderBy('month')
@@ -299,8 +318,12 @@ class PaymentController extends Controller
                 ]);
         } else {
             $date = $request->date ?? Carbon::today()->toDateString();
+            $from = Carbon::parse($date)->toDateString();
+            $to   = Carbon::parse($date)->addDay()->toDateString();
             $data = Payment::where('status', 'paid')
-                ->whereDate('payment_date', $date)
+                ->when($request->branch_id, fn($q) => $q->where('branch_id', $request->branch_id))
+                ->where('payment_date', '>=', $from)
+                ->where('payment_date', '<', $to)
                 ->selectRaw('HOUR(created_at) as hour, SUM(amount) as total, COUNT(*) as count')
                 ->groupByRaw('HOUR(created_at)')
                 ->orderBy('hour')
@@ -321,7 +344,7 @@ class PaymentController extends Controller
     ==========================================================================*/
     public function show($id)
     {
-        $payment = Payment::with(['user', 'subscription.plan', 'promotion'])->findOrFail($id);
+        $payment = Payment::with(['user', 'branch', 'subscription.plan', 'promotion'])->findOrFail($id);
         return response()->json($this->formatPayment($payment));
     }
 
@@ -343,6 +366,7 @@ class PaymentController extends Controller
     {
         $data = $request->validate([
             'user_id'          => 'required|exists:users,id',
+            'branch_id'        => 'nullable|exists:branches,id',
             'subscription_id'  => 'nullable|exists:member_subscriptions,id',
             'amount'           => 'required|numeric|min:0',
             'payment_method'   => 'required|in:cash,card,bank_transfer',
@@ -355,12 +379,13 @@ class PaymentController extends Controller
 
         $data['invoice_number']    = 'INV-' . strtoupper(Str::random(8));
         $data['payment_date']      = $data['payment_date'] ?? Carbon::today()->toDateString();
+        $data['branch_id']         = $data['branch_id'] ?? User::whereKey($data['user_id'])->value('branch_id');
         // BUG FIX: phải set status trước rồi mới dùng nó để tính payment_confirmed
         $data['status']            = $data['status'] ?? 'paid';
         $data['payment_confirmed'] = $data['payment_confirmed'] ?? ($data['status'] === 'paid');
 
         $payment = Payment::create($data);
-        $payment->load(['user', 'subscription.plan', 'promotion']);
+        $payment->load(['user', 'branch', 'subscription.plan', 'promotion']);
 
         return response()->json($this->formatPayment($payment), 201);
     }
@@ -381,7 +406,7 @@ class PaymentController extends Controller
             'note'              => 'nullable|string|max:500',
         ]);
         $payment->update($data);
-        return response()->json($this->formatPayment($payment->load(['user', 'subscription.plan', 'promotion'])));
+        return response()->json($this->formatPayment($payment->load(['user', 'branch', 'subscription.plan', 'promotion'])));
     }
 
     /*==========================================================================
@@ -422,7 +447,7 @@ class PaymentController extends Controller
 
         return response()->json([
             'message' => 'Xác nhận thanh toán thành công',
-            'payment' => $this->formatPayment($payment->fresh(['user', 'subscription.plan', 'promotion'])),
+            'payment' => $this->formatPayment($payment->fresh(['user', 'branch', 'subscription.plan', 'promotion'])),
         ]);
     }
 
@@ -454,7 +479,7 @@ class PaymentController extends Controller
 
         return response()->json([
             'message' => 'Hoàn tiền thành công',
-            'payment' => $this->formatPayment($payment->fresh(['user', 'subscription.plan', 'promotion'])),
+            'payment' => $this->formatPayment($payment->fresh(['user', 'branch', 'subscription.plan', 'promotion'])),
         ]);
     }
 
@@ -495,9 +520,9 @@ class PaymentController extends Controller
         $today     = Carbon::today();
         $promotion = Promotion::where('code', strtoupper(trim($request->code)))
             ->where('is_active', true)
-            ->where('start_date', '<=', $today)
-            ->where('end_date',   '>=', $today)
-            ->whereColumn('current_usage', '<', 'usage_limit')
+            ->where(fn($q) => $q->whereNull('start_date')->orWhere('start_date', '<=', $today))
+            ->where(fn($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $today))
+            ->where(fn($q) => $q->whereNull('usage_limit')->orWhereColumn('current_usage', '<', 'usage_limit'))
             ->first();
 
         if (!$promotion) {

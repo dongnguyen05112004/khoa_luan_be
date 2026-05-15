@@ -203,7 +203,7 @@ PROMPT;
 
             $checkins = $member->checkins;
             $lastCheckin = $checkins->sortByDesc('check_in_at')->first();
-            $daysSinceLastCheckin = $lastCheckin ? now()->diffInDays(Carbon::parse($lastCheckin->check_in_at)) : 999;
+            $daysSinceLastCheckin = $lastCheckin ? (int) now()->diffInDays(Carbon::parse($lastCheckin->check_in_at)) : 999;
             
             $checkinsThisMonth = $checkins->where('check_in_at', '>=', now()->subDays(30))->count();
             $checkinsLastMonth = $checkins->where('check_in_at', '>=', now()->subDays(60))->where('check_in_at', '<', now()->subDays(30))->count();
@@ -214,7 +214,7 @@ PROMPT;
                 'checkins_this_month'     => $checkinsThisMonth,
                 'checkins_last_month'     => $checkinsLastMonth,
                 'days_until_expiration'   => $daysLeft,
-                'goal'                    => $member->memberProfile->health_notes ?? 'Không rõ mục tiêu',
+                'goal'                    => $member->memberProfile?->health_notes ?? 'Không rõ mục tiêu',
             ];
         })->values()->toArray();
 
@@ -248,10 +248,18 @@ Trả về ĐÚNG định dạng MẢNG JSON sau (không kèm markdown):
 PROMPT;
 
                 $raw         = $this->callAI($groq, $gemini, $prompt);
-                $raw         = preg_replace('/```json|```/', '', $raw);
+                
+                // Trích xuất JSON từ chuỗi (đề phòng AI trả về text giải thích bên ngoài)
+                $jsonStart = strpos($raw, '[');
+                $jsonEnd   = strrpos($raw, ']');
+                if ($jsonStart !== false && $jsonEnd !== false) {
+                    $raw = substr($raw, $jsonStart, $jsonEnd - $jsonStart + 1);
+                }
+
                 $parsedArray = json_decode(trim($raw), true);
 
                 if (!is_array($parsedArray) || empty($parsedArray)) {
+                    Log::error("Churn Prediction JSON Error. Raw: " . $raw);
                     throw new \Exception('AI trả về sai định dạng mảng JSON cho Churn Prediction.');
                 }
 
@@ -293,16 +301,19 @@ PROMPT;
         try {
             $cachedData = Cache::remember($cacheKey, now()->addMinutes(15), function () use ($request, $groq, $gemini) {
                 $currentMonth = now();
+                $currentMonthStart = $currentMonth->copy()->startOfMonth();
+                $nextMonthStart    = $currentMonthStart->copy()->addMonth();
                 $lastMonth    = now()->subMonth(); // Lưu vào biến, tránh gọi subMonth() nhiều lần
+                $lastMonthStart = $lastMonth->copy()->startOfMonth();
 
                 $currentRevenue = \App\Models\Payment::where('status', 'paid')
-                    ->whereMonth('payment_date', $currentMonth->month)
-                    ->whereYear('payment_date', $currentMonth->year)
+                    ->where('payment_date', '>=', $currentMonthStart->toDateString())
+                    ->where('payment_date', '<', $nextMonthStart->toDateString())
                     ->sum('amount');
 
                 $lastRevenue = \App\Models\Payment::where('status', 'paid')
-                    ->whereMonth('payment_date', $lastMonth->month)
-                    ->whereYear('payment_date', $lastMonth->year)
+                    ->where('payment_date', '>=', $lastMonthStart->toDateString())
+                    ->where('payment_date', '<', $currentMonthStart->toDateString())
                     ->sum('amount');
 
                 $totalSubs  = \App\Models\MemberSubscription::count();
@@ -509,7 +520,7 @@ Trả về JSON (Tiếng Việt, không markdown):
                     ->groupBy('rating')->pluck('cnt', 'rating');
                 $recentNeg = \App\Models\MemberFeedback::where('rating', '<=', 2)
                     ->where('created_at', '>=', now()->subDays(30))
-                    ->pluck('content')->take(5);
+                    ->pluck('comment')->take(5);
 
                 $payload = compact('avgRating', 'total', 'urgent', 'byRating') + [
                     'recent_negative_samples' => $recentNeg,
@@ -550,12 +561,15 @@ Trả về JSON (Tiếng Việt, không markdown):
             $data = Cache::remember($cacheKey, now()->addMinutes(15), function () use ($request, $groq, $gemini) {
                 $now      = now();
                 $lastMonth = now()->subMonth(); // lưu biến để tránh drift
+                $monthStart     = $now->copy()->startOfMonth();
+                $nextMonthStart = $monthStart->copy()->addMonth();
+                $lastMonthStart = $lastMonth->copy()->startOfMonth();
 
-                $revenue    = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', $now->month)->whereYear('payment_date', $now->year)->sum('amount');
-                $revLast    = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', $lastMonth->month)->whereYear('payment_date', $lastMonth->year)->sum('amount');
-                $newMembers = \App\Models\User::whereHas('role', fn($q) => $q->where('role_name', 'member'))->whereMonth('created_at', $now->month)->count();
+                $revenue    = \App\Models\Payment::where('status', 'paid')->where('payment_date', '>=', $monthStart->toDateString())->where('payment_date', '<', $nextMonthStart->toDateString())->sum('amount');
+                $revLast    = \App\Models\Payment::where('status', 'paid')->where('payment_date', '>=', $lastMonthStart->toDateString())->where('payment_date', '<', $monthStart->toDateString())->sum('amount');
+                $newMembers = \App\Models\User::whereHas('role', fn($q) => $q->where('role_name', 'member'))->where('created_at', '>=', $monthStart)->where('created_at', '<', $nextMonthStart)->count();
                 $total      = \App\Models\User::whereHas('role', fn($q) => $q->where('role_name', 'member'))->count();
-                $checkins   = \App\Models\Checkin::whereMonth('check_in_at', $now->month)->count();
+                $checkins   = \App\Models\Checkin::where('check_in_at', '>=', $monthStart)->where('check_in_at', '<', $nextMonthStart)->count();
                 $activeContracts  = \App\Models\MemberSubscription::where('status', 'active')->count();
                 $pendingPayments  = \App\Models\Payment::where('status', 'pending')->count();
 
@@ -660,9 +674,12 @@ Trả về JSON (Tiếng Việt, không markdown):
             $data = Cache::remember($cacheKey, now()->addMinutes(20), function () use ($request, $groq, $gemini) {
                 $now       = now();
                 $lastMonth = now()->subMonth();
+                $monthStart     = $now->copy()->startOfMonth();
+                $nextMonthStart = $monthStart->copy()->addMonth();
+                $lastMonthStart = $lastMonth->copy()->startOfMonth();
 
-                $revenue   = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', $now->month)->sum('amount');
-                $revLast   = \App\Models\Payment::where('status', 'paid')->whereMonth('payment_date', $lastMonth->month)->sum('amount');
+                $revenue   = \App\Models\Payment::where('status', 'paid')->where('payment_date', '>=', $monthStart->toDateString())->where('payment_date', '<', $nextMonthStart->toDateString())->sum('amount');
+                $revLast   = \App\Models\Payment::where('status', 'paid')->where('payment_date', '>=', $lastMonthStart->toDateString())->where('payment_date', '<', $monthStart->toDateString())->sum('amount');
                 $active    = \App\Models\MemberSubscription::where('status', 'active')->count();
                 $total     = \App\Models\MemberSubscription::count();
                 $avgRating = round(\App\Models\MemberFeedback::avg('rating') ?? 0, 1);
@@ -723,7 +740,14 @@ Trả về JSON (Tiếng Việt, không markdown):
     private function callAiAndParse(GroqService $groq, GeminiService $gemini, string $prompt, array $requiredKeys = ['title']): array
     {
         $raw    = $this->callAI($groq, $gemini, $prompt);
-        $raw    = preg_replace('/```json|```/', '', $raw);
+        
+        // Trích xuất JSON object {...}
+        $jsonStart = strpos($raw, '{');
+        $jsonEnd   = strrpos($raw, '}');
+        if ($jsonStart !== false && $jsonEnd !== false) {
+            $raw = substr($raw, $jsonStart, $jsonEnd - $jsonStart + 1);
+        }
+
         $parsed = json_decode(trim($raw), true);
 
         if ($parsed === null) {

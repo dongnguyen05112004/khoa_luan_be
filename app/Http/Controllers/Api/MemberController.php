@@ -185,8 +185,10 @@ class MemberController extends Controller
             ->whereHas('subscriptions', fn($q) => $q->where('status', 'active'))
             ->count();
 
+        $today = Carbon::today();
         $newToday = (clone $baseQuery)
-            ->whereDate('created_at', Carbon::today())
+            ->where('created_at', '>=', $today)
+            ->where('created_at', '<', $today->copy()->addDay())
             ->count();
 
         // Hội viên mới tuần này
@@ -476,7 +478,13 @@ class MemberController extends Controller
 
         $checkins = Checkin::with('branch')
             ->where('user_id', $id)
-            ->when($request->date, fn($q) => $q->whereDate('check_in_at', $request->date))
+            ->when($request->date, function ($q) use ($request) {
+                $from = Carbon::parse($request->date)->startOfDay();
+                $to = $from->copy()->addDay();
+
+                $q->where('check_in_at', '>=', $from)
+                    ->where('check_in_at', '<', $to);
+            })
             ->latest('check_in_at')
             ->paginate($request->per_page ?? 20);
 

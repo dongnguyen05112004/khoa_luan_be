@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\OtherExpense;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class OtherExpenseController extends Controller
@@ -14,8 +15,8 @@ class OtherExpenseController extends Controller
         return response()->json(
             OtherExpense::with(['branch', 'creator'])
                 ->when($request->branch_id, fn($q) => $q->where('branch_id', $request->branch_id))
-                ->when($request->date_from, fn($q) => $q->whereDate('expense_date', '>=', $request->date_from))
-                ->when($request->date_to, fn($q) => $q->whereDate('expense_date', '<=', $request->date_to))
+                ->when($request->date_from, fn($q) => $q->where('expense_date', '>=', $request->date_from))
+                ->when($request->date_to, fn($q) => $q->where('expense_date', '<', Carbon::parse($request->date_to)->addDay()->toDateString()))
                 ->latest('expense_date')->get()
         );
     }

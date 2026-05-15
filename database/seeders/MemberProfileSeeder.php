@@ -16,7 +16,7 @@ class MemberProfileSeeder extends Seeder
     public function run(): void
     {
         // Lấy tất cả user có role 5 (member) hoặc 6 (guest) chưa có profile
-        $memberRoleIds = [5, 6];
+        $memberRoleIds = [5];
         $existingProfileUserIds = DB::table('member_profiles')->pluck('user_id')->toArray();
 
         $users = DB::table('users')
@@ -67,16 +67,15 @@ class MemberProfileSeeder extends Seeder
         foreach ($users as $user) {
             $joinDate = $joinDates[$i % count($joinDates)];
             $dob      = $dobs[$i % count($dobs)];
-            $isGuest  = $user->role_id == 6;
 
             DB::table('member_profiles')->insert([
                 'user_id'           => $user->id,
                 'date_of_birth'     => $dob,
-                'join_date'         => $isGuest ? null : $joinDate,
+                'join_date'         => $joinDate,
                 'emergency_contact' => $emergencyContacts[$i % count($emergencyContacts)],
                 'health_notes'      => $healthNotes[$i % count($healthNotes)],
                 'profile_picture'   => null,
-                'membership_type'   => $isGuest ? 'guest' : $membershipTypes[$i % count($membershipTypes)],
+                'membership_type'   => $membershipTypes[$i % count($membershipTypes)],
                 'created_at'        => $joinDate . ' 09:00:00',
                 'updated_at'        => $joinDate . ' 09:00:00',
             ]);

@@ -53,8 +53,9 @@ class Promotion extends Model
     public function getIsValidAttribute()
     {
         $now = now();
-        $timeValid = $now->between($this->start_date, $this->end_date);
-        $usageValid = $this->current_usage < $this->usage_limit;
+        $timeValid = (!$this->start_date || $now->greaterThanOrEqualTo($this->start_date))
+            && (!$this->end_date || $now->lessThanOrEqualTo($this->end_date));
+        $usageValid = is_null($this->usage_limit) || $this->current_usage < $this->usage_limit;
 
         return $this->is_active && $timeValid && $usageValid;
     }

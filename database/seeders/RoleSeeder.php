@@ -15,7 +15,6 @@ class RoleSeeder extends Seeder
             ['id' => 3, 'role_name' => 'staff',    'created_at' => now(), 'updated_at' => now()],
             ['id' => 4, 'role_name' => 'trainer',  'created_at' => now(), 'updated_at' => now()],
             ['id' => 5, 'role_name' => 'member',   'created_at' => now(), 'updated_at' => now()],
-            ['id' => 6, 'role_name' => 'guest',    'created_at' => now(), 'updated_at' => now()],
         ];
 
         foreach ($roles as $role) {

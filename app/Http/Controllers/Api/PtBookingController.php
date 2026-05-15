@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PtBooking;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class PtBookingController extends Controller
@@ -15,7 +16,13 @@ class PtBookingController extends Controller
             ->when($request->trainer_id, fn($q) => $q->where('trainer_id', $request->trainer_id))
             ->when($request->contract_id, fn($q) => $q->where('contract_id', $request->contract_id))
             ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->date, fn($q) => $q->whereDate('schedule_time', $request->date))
+            ->when($request->date, function ($q) use ($request) {
+                $from = Carbon::parse($request->date)->startOfDay();
+                $to = $from->copy()->addDay();
+
+                $q->where('schedule_time', '>=', $from)
+                    ->where('schedule_time', '<', $to);
+            })
             ->get();
         return response()->json($bookings);
     }

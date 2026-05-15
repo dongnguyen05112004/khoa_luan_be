@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Checkin;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -15,7 +16,13 @@ class CheckinController extends Controller
         $checkins = Checkin::with(['user', 'branch'])
             ->when($request->user_id, fn($q) => $q->where('user_id', $request->user_id))
             ->when($request->branch_id, fn($q) => $q->where('branch_id', $request->branch_id))
-            ->when($request->date, fn($q) => $q->whereDate('check_in_at', $request->date))
+            ->when($request->date, function ($q) use ($request) {
+                $from = Carbon::parse($request->date)->startOfDay();
+                $to = $from->copy()->addDay();
+
+                $q->where('check_in_at', '>=', $from)
+                    ->where('check_in_at', '<', $to);
+            })
             ->latest('check_in_at')
             ->paginate($request->per_page ?? 20);
         return response()->json($checkins);

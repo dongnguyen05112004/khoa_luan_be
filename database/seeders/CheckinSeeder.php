@@ -24,7 +24,7 @@ class CheckinSeeder extends Seeder
         $checkins = [];
 
         $members = DB::table('users')
-            ->whereIn('role_id', [5, 6])
+            ->where('role_id', 5)
             ->orderBy('id')
             ->get();
 
@@ -34,15 +34,8 @@ class CheckinSeeder extends Seeder
 
         // Tạo checkin cho từng hội viên
         foreach ($members as $idx => $user) {
-            $isGuest    = $user->role_id == 6;
-            $branchId   = $user->branch_id;
-
-            // Xác định tần suất tập
-            if ($isGuest) {
-                // Khách vãng lai: 2-4 lần tổng cộng
-                $checkinDates = $this->generateGuestCheckinDates($idx);
-            } else {
-                // Hội viên: tập đều đặn từ khi đăng ký
+            $branchId = $user->branch_id;
+            // Hội viên: tập đều đặn từ khi đăng ký
                 $sub = DB::table('member_subscriptions')
                     ->where('user_id', $user->id)
                     ->orderBy('start_date')
@@ -51,7 +44,6 @@ class CheckinSeeder extends Seeder
                 $startDate = $sub->start_date;
                 $endDate   = min($sub->end_date, date('Y-m-d'));
                 $checkinDates = $this->generateMemberCheckinDates($startDate, $endDate, $idx);
-            }
 
             foreach ($checkinDates as $dateStr) {
                 $isPeakMorning = rand(0, 1) === 0;
@@ -118,25 +110,5 @@ class CheckinSeeder extends Seeder
         }
 
         return $dates;
-    }
-
-    /**
-     * Tạo ngày check-in cho khách vãng lai (2-4 lần tổng)
-     */
-    private function generateGuestCheckinDates(int $seed): array
-    {
-        $availableDates = [
-            '2025-10-18', '2025-11-02', '2025-11-15', '2025-12-05',
-            '2025-12-20', '2026-01-10', '2026-01-25', '2026-02-08',
-            '2026-02-22', '2026-03-07', '2026-03-20', '2026-04-04',
-            '2026-04-18', '2026-05-03', '2026-05-11',
-        ];
-        $count = rand(2, 4);
-        $selected = [];
-        for ($i = 0; $i < $count; $i++) {
-            $selected[] = $availableDates[($seed + $i * 3) % count($availableDates)];
-        }
-        sort($selected);
-        return array_unique($selected);
     }
 }

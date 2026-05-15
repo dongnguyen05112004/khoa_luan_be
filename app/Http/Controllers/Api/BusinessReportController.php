@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\BusinessReport;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class BusinessReportController extends Controller
@@ -12,8 +13,8 @@ class BusinessReportController extends Controller
     public function index(Request $request)
     {
         return response()->json(
-            BusinessReport::when($request->date_from, fn($q) => $q->whereDate('date_from_summary', '>=', $request->date_from))
-                ->when($request->date_to, fn($q) => $q->whereDate('date_from_summary', '<=', $request->date_to))
+            BusinessReport::when($request->date_from, fn($q) => $q->where('date_from_summary', '>=', $request->date_from))
+                ->when($request->date_to, fn($q) => $q->where('date_from_summary', '<', Carbon::parse($request->date_to)->addDay()->toDateString()))
                 ->latest('date_from_summary')->get()
         );
     }

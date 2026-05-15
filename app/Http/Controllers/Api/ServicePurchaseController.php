@@ -92,7 +92,7 @@ class ServicePurchaseController extends Controller
         $activePlan = MemberSubscription::with(['plan', 'promotion'])
             ->where('user_id', $user->id)
             ->whereIn('status', ['active', 'pending'])
-            ->whereDate('end_date', '>=', Carbon::today())
+            ->where('end_date', '>=', Carbon::today()->toDateString())
             ->latest()
             ->first();
 
@@ -143,7 +143,7 @@ class ServicePurchaseController extends Controller
         // Mỗi hội viên chỉ được phép có 1 gói tập duy nhất ở trạng thái active hoặc đang chờ thanh toán.
         $existing = MemberSubscription::where('user_id', $user->id)
             ->whereIn('status', ['active', 'pending'])
-            ->whereDate('end_date', '>=', Carbon::today())
+            ->where('end_date', '>=', Carbon::today()->toDateString())
             ->first();
 
         if ($existing) {
@@ -183,6 +183,7 @@ class ServicePurchaseController extends Controller
             Payment::create([
                 'invoice_number'  => 'INV-' . strtoupper(Str::random(8)),
                 'user_id'         => $user->id,
+                'branch_id'       => $user->branch_id,
                 'subscription_id' => $sub->id,
                 'amount'          => $finalPrice,
                 'payment_method'  => 'bank_transfer', // Mặc định là chuyển khoản/online
@@ -269,6 +270,7 @@ class ServicePurchaseController extends Controller
             Payment::create([
                 'invoice_number' => 'INV-' . strtoupper(Str::random(8)),
                 'user_id'        => $user->id,
+                'branch_id'      => $data['branch_id'] ?? $trainer->branch_id ?? $user->branch_id,
                 'payable_id'     => $contract->id,
                 'payable_type'   => PtContract::class,
                 'amount'         => $totalPrice,

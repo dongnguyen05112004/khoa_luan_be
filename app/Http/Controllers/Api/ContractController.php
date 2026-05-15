@@ -160,9 +160,11 @@ class ContractController extends Controller
         $revenueTotal = (clone $base)->sum('price');
 
         // Hợp đồng mới trong tháng này
+        $monthStart = Carbon::now()->startOfMonth();
+        $nextMonthStart = $monthStart->copy()->addMonth();
         $newThisMonth = (clone $base)
-            ->whereYear('created_at', Carbon::now()->year)
-            ->whereMonth('created_at', Carbon::now()->month)
+            ->where('created_at', '>=', $monthStart)
+            ->where('created_at', '<', $nextMonthStart)
             ->count();
 
         return response()->json([
@@ -241,6 +243,7 @@ class ContractController extends Controller
                 Payment::create([
                     'invoice_number'    => 'INV-' . strtoupper(Str::random(8)),
                     'user_id'           => $data['user_id'],
+                    'branch_id'         => User::whereKey($data['user_id'])->value('branch_id'),
                     'subscription_id'   => $sub->id,
                     'amount'            => $data['price'],
                     'payment_date'      => $data['start_date'],
@@ -339,6 +342,7 @@ class ContractController extends Controller
             Payment::create([
                 'invoice_number'    => 'INV-' . strtoupper(Str::random(8)),
                 'user_id'           => $oldSub->user_id,
+                'branch_id'         => $oldSub->user?->branch_id,
                 'subscription_id'   => $newSub->id,
                 'amount'            => $price,
                 'payment_date'      => $startDate->toDateString(),

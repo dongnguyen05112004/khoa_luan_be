@@ -25,9 +25,9 @@ class PromotionController extends Controller
     {
         $today = Carbon::today();
         $promotions = Promotion::where('is_active', true)
-            ->where('start_date', '<=', $today)
-            ->where('end_date', '>=', $today)
-            ->whereColumn('current_usage', '<', 'usage_limit')
+            ->where(fn($q) => $q->whereNull('start_date')->orWhere('start_date', '<=', $today))
+            ->where(fn($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $today))
+            ->where(fn($q) => $q->whereNull('usage_limit')->orWhereColumn('current_usage', '<', 'usage_limit'))
             ->orderBy('discount', 'desc')
             ->get(['id', 'title', 'code', 'discount', 'end_date']);
 

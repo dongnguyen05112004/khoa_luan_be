@@ -30,12 +30,16 @@ class PtBooking extends Model
     // Lấy các buổi tập đã hoàn thành (Để tính lương cho PT hoặc trừ buổi tập trong hợp đồng)
     public function scopeCompleted($query)
     {
-        return $query->where('status', 'completed');
+        return $query->where('status', 'done');
     }
 
     // Lấy lịch tập trong ngày hôm nay
     public function scopeToday($query)
     {
-        return $query->whereDate('schedule_time', now()->toDateString());
+        $from = now()->startOfDay();
+        $to = $from->copy()->addDay();
+
+        return $query->where('schedule_time', '>=', $from)
+                    ->where('schedule_time', '<', $to);
     }
 }

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Hash;
  *
  * Role mapping:
  *   1 = admin   | 2 = manager | 3 = staff (lễ tân)
- *   4 = trainer | 5 = member  | 6 = guest (khách vãng lai)
+ *   4 = trainer | 5 = member
  *
  * Branch mapping:
  *   1 = Quận 1 | 2 = Bình Thạnh | 3 = Gò Vấp
@@ -218,45 +218,7 @@ class UserSeeder extends Seeder
                 'card_number' => $cardNumber,
                 'state'       => $state,
             ]);
-            $i++;
-        }
-
-        // =====================================================================
-        // 6. KHÁCH VÃNG LAI (guests) - 15 người
-        // Khách vãng lai không nhất thiết có gói tập dài hạn,
-        // thường chỉ ghé check-in 1 lần hoặc mua gói ngắn.
-        // =====================================================================
-        $guests = [
-            ['Phan Văn Chính',      'guest.chinh@gmail.com',   '0906100001', 'male',   1],
-            ['Tô Thị Duyên',        'guest.duyen@gmail.com',   '0906100002', 'female', 1],
-            ['Cao Văn Hảo',         'guest.hao@gmail.com',     '0906100003', 'male',   2],
-            ['Lâm Thị Kiều',        'guest.kieu@gmail.com',    '0906100004', 'female', 2],
-            ['Huỳnh Văn Lộc',       'guest.loc@gmail.com',     '0906100005', 'male',   1],
-            ['Nguyễn Thị Mơ',       'guest.mo@gmail.com',      '0906100006', 'female', 3],
-            ['Võ Văn Nghĩa',        'guest.nghia@gmail.com',   '0906100007', 'male',   3],
-            ['Trần Thị Oanh',       'guest.oanh@gmail.com',    '0906100008', 'female', 1],
-            ['Lê Văn Phú',          'guest.phu@gmail.com',     '0906100009', 'male',   2],
-            ['Phạm Thị Quê',        'guest.que@gmail.com',     '0906100010', 'female', 1],
-            ['Hoàng Văn Rạng',      'guest.rang@gmail.com',    '0906100011', 'male',   3],
-            ['Vũ Thị Sim',          'guest.sim@gmail.com',     '0906100012', 'female', 2],
-            ['Đặng Văn Tâm',        'guest.tam@gmail.com',     '0906100013', 'male',   1],
-            ['Bùi Thị Uyên',        'guest.uyen@gmail.com',    '0906100014', 'female', 1],
-            ['Đỗ Văn Vọng',         'guest.vong@gmail.com',    '0906100015', 'male',   2],
-        ];
-        $gi = 1;
-        foreach ($guests as [$fullName, $email, $phone, $gender, $branchId]) {
-            User::firstOrCreate(['email' => $email], [
-                'name'        => 'khách vãng lai',
-                'full_name'   => $fullName,
-                'password'    => Hash::make('password'),
-                'role_id'     => 6,
-                'branch_id'   => $branchId,
-                'phone'       => $phone,
-                'gender'      => $gender,
-                'card_number' => 'GST-' . str_pad($gi, 3, '0', STR_PAD_LEFT),
-                'state'       => 'active',
-            ]);
-            $gi++;
+        $i++;
         }
     }
 }

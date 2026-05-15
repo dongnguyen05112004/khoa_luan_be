@@ -63,8 +63,11 @@ class EquipmentMaintenance extends Model
 
     public function scopeMonthly($query, $month, $year)
     {
-        return $query->whereMonth('maintenance_date', $month)
-                    ->whereYear('maintenance_date', $year);
+        $from = \Carbon\Carbon::create((int) $year, (int) $month, 1);
+        $to = $from->copy()->addMonth();
+
+        return $query->where('maintenance_date', '>=', $from->toDateString())
+                    ->where('maintenance_date', '<', $to->toDateString());
     }
 
     public function scopeLatestForEquipment($query, $equipmentId)
