@@ -50,12 +50,29 @@ class PtBookingController extends Controller
     public function update(Request $request, $id)
     {
         $booking = PtBooking::findOrFail($id);
+        $oldStatus = $booking->status;
+
         $data = $request->validate([
             'schedule_time' => 'sometimes|date',
             'status'        => 'sometimes|in:pending,confirmed,done,cancelled',
             'notes'         => 'nullable|string',
         ]);
+        
         $booking->update($data);
+
+        if (isset($data['status']) && $oldStatus !== $data['status']) {
+            $contract = $booking->contract;
+            if ($contract) {
+                if ($data['status'] === 'done') {
+                    $contract->used_sessions = ($contract->used_sessions ?? 0) + 1;
+                    $contract->save();
+                } elseif ($oldStatus === 'done') {
+                    $contract->used_sessions = max(0, ($contract->used_sessions ?? 0) - 1);
+                    $contract->save();
+                }
+            }
+        }
+
         return response()->json($booking);
     }
 
