@@ -199,7 +199,7 @@ PROMPT;
                     Carbon::parse($member->activeSubscription->end_date),
                     false
                 );
-            }
+            }                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
 
             $checkins = $member->checkins;
             $lastCheckin = $checkins->sortByDesc('check_in_at')->first();
