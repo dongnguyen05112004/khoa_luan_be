@@ -8,6 +8,7 @@ use App\Http\Resources\UserListResource;
 use App\Http\Resources\UserCollection;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
@@ -15,7 +16,7 @@ class UserController extends Controller
     /** GET /api/users */
     public function index(Request $request)
     {
-        $users = User::with(['role', 'branch'])
+        $query = User::with(['role', 'branch'])
             ->when($request->role_id, fn($q) => $q->where('role_id', $request->role_id))
             ->when($request->branch_id, fn($q) => $q->where('branch_id', $request->branch_id))
             ->when($request->state, fn($q) => $q->where('state', $request->state))
@@ -24,7 +25,9 @@ class UserController extends Controller
                    ->orWhere('email', 'like', '%' . $request->search . '%')
                    ->orWhere('phone', 'like', '%' . $request->search . '%');
             }))
-            ->paginate($request->per_page ?? 20);
+            ->orderBy('id');
+
+        $users = $this->attachDisplayIds($this->paginateUsers($query, $request, 20));
 
         return new UserCollection($users);
     }
@@ -183,14 +186,18 @@ class UserController extends Controller
     /** DELETE /api/users/{id} */
     public function destroy($id)
     {
-        $userToDelete = User::with('role')->findOrFail($id);
+        $userToDelete = User::withTrashed()->with('role')->findOrFail($id);
 
         if (strtolower($userToDelete->role?->role_name) === 'admin') {
             return response()->json(['message' => 'Không thể xóa tài khoản Admin hệ thống.'], 403);
         }
 
-        $userToDelete->delete();
-        return response()->json(['message' => 'Đã xóa tài khoản']);
+        DB::transaction(function () use ($userToDelete) {
+            $userToDelete->tokens()->delete();
+            $userToDelete->forceDelete();
+        });
+
+        return response()->json(['message' => 'Đã xóa vĩnh viễn tài khoản']);
     }
 
     /** GET /api/users/{id}/subscriptions */
@@ -220,14 +227,56 @@ class UserController extends Controller
     public function adminGetUser(Request $request)
     {
         // 1. Khởi tạo Query
-        $query = User::query()->with(['role', 'branch']);
+        $query = User::query()->with(['role', 'branch'])
+            ->when($request->role_id, fn($q) => $q->where('role_id', $request->role_id))
+            ->when($request->state, fn($q) => $q->where('state', $request->state))
+            ->when($request->search, fn($q) => $q->where(function ($q2) use ($request) {
+                $q2->where('name', 'like', '%' . $request->search . '%')
+                   ->orWhere('full_name', 'like', '%' . $request->search . '%')
+                   ->orWhere('email', 'like', '%' . $request->search . '%')
+                   ->orWhere('phone', 'like', '%' . $request->search . '%');
+            }))
+            ->orderBy('id');
         //Lọc theo chi nhánh
         $query->when($request->branch_id, function ($q, $branchId) {
             return $q->where('branch_id', $branchId);
         });
         //phân trang
-        $users = $query->paginate($request->get('per_page', 15));
+        // Mặc định endpoint admin trả toàn bộ users để FE có đủ dữ liệu.
+        // Truyền paginated=true nếu cần server-side pagination.
+        $users = $this->attachDisplayIds($this->paginateUsers($query, $request, 15, true));
 
         return UserListResource::collection($users);
+    }
+
+    private function attachDisplayIds($users)
+    {
+        $start = $users->firstItem() ?? 1;
+
+        $users->getCollection()->transform(function ($user, int $index) use ($start) {
+            $user->display_id = $start + $index;
+            return $user;
+        });
+
+        return $users;
+    }
+
+    private function paginateUsers($query, Request $request, int $defaultPerPage, bool $defaultAll = false)
+    {
+        $returnAll = !$request->boolean('paginated') && (
+            $defaultAll
+            || $request->boolean('all')
+            || strtolower((string) $request->input('per_page')) === 'all'
+        );
+
+        if ($returnAll) {
+            $total = (clone $query)->count();
+            return $query->paginate(max($total, 1), ['*'], 'page', 1);
+        }
+
+        $perPage = (int) $request->input('per_page', $defaultPerPage);
+        $perPage = max(1, min($perPage, 500));
+
+        return $query->paginate($perPage);
     }
 }

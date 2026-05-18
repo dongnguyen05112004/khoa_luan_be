@@ -135,6 +135,20 @@ class PromotionSeeder extends Seeder
                 'created_at'    => '2026-04-28 09:00:00',
                 'updated_at'    => '2026-05-13 09:00:00',
             ],
+            [
+                'id'            => 9,
+                'title'         => 'Tháng 6 - Bùng nổ cơ bắp Giảm 10%',
+                'code'          => 'MUSCLE',
+                'description'   => 'Chào đón mùa hè! Giảm 10% tất cả gói tập trong tháng 6.',
+                'discount'      => 10.00,
+                'start_date'    => '2026-06-01',
+                'end_date'      => '2026-06-30',
+                'usage_limit'   => 100,
+                'current_usage' => 0,
+                'is_active'     => true,
+                'created_at'    => '2026-05-10 09:00:00',
+                'updated_at'    => '2026-05-29 17:30:00',   
+            ],
         ];
 
         foreach ($promotions as $promo) {

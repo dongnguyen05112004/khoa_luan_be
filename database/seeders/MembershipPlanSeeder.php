@@ -98,6 +98,17 @@ class MembershipPlanSeeder extends Seeder
                 'created_at'   => '2025-09-01 08:00:00',
                 'updated_at'   => '2026-03-01 10:00:00',
             ],
+            [
+                'id'           => 8,
+                'plan_name'    => 'Gói demo 1 Tháng',
+                'duration_days'=> 30,
+                'price'        => 10000,
+                'value'        => 100000,
+                'description'  => 'Gói demo 1 Tháng',
+                'status'       => 'active',
+                'created_at'   => '2025-09-01 08:00:00',
+                'updated_at'   => '2026-03-01 10:00:00',
+            ],
         ];
 
         foreach ($plans as $plan) {

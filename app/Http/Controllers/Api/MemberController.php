@@ -427,9 +427,18 @@ class MemberController extends Controller
     ==========================================================================*/
     public function destroy($id)
     {
-        $user = User::findOrFail($id);
-        $user->delete(); // SoftDelete
-        return response()->json(['message' => 'Đã xóa hội viên thành công']);
+        $user = User::withTrashed()->with('role')->findOrFail($id);
+
+        if (strtolower($user->role?->role_name ?? '') !== 'member') {
+            return response()->json(['message' => 'Chỉ được xóa hội viên từ API này.'], 403);
+        }
+
+        DB::transaction(function () use ($user) {
+            $user->tokens()->delete();
+            $user->forceDelete();
+        });
+
+        return response()->json(['message' => 'Đã xóa vĩnh viễn hội viên thành công']);
     }
 
     /*==========================================================================

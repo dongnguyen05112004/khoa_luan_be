@@ -438,7 +438,7 @@ Trả về JSON (Tiếng Việt, không markdown):
                 $prompt = 'Bạn là chuyên gia phân tích sản phẩm dịch vụ cho phòng Gym.
 Dữ liệu các gói tập: ' . json_encode($plans, JSON_UNESCAPED_UNICODE) . '
 
-Phân tích: gói bán chạy nhất, gói kém hiệu quả, cơ hội tối ưu danh mục.
+Phân tích: gói bán chạy nhất, gói kém hiệu quả, cơ hội tối ưu danh mục. 
 Trả về JSON (Tiếng Việt, không markdown):
 {
   "title": "...",
