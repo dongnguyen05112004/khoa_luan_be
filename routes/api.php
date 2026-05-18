@@ -121,8 +121,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('contracts', ContractController::class);                                 // CRUD hợp đồng
 
     // Promotions (Khuyến mãi)
-    Route::get('/promotions/active', [PromotionController::class, 'activeOnly']); // Khuyến mãi còn hiệu lực
-    Route::get('/promotions/check',  [PromotionController::class, 'checkByCode']); // Kiểm tra mã KM theo code
+    Route::get('/promotions/active',           [PromotionController::class, 'activeOnly']);    // Khuyến mãi còn hiệu lực
+    Route::get('/promotions/check',            [PromotionController::class, 'checkByCode']);   // Kiểm tra mã KM theo code
+    Route::patch('/promotions/{id}/toggle',    [PromotionController::class, 'toggleStatus']);  // Bật/Tắt trạng thái
     Route::resource('promotions', PromotionController::class);
 
     /*==========================================================

@@ -67,9 +67,34 @@ class PromotionController extends Controller
             'start_date'  => 'nullable|date',
             'end_date'    => 'nullable|date',
             'usage_limit' => 'nullable|integer|min:0',
+            'is_active'   => 'nullable|boolean',
         ]);
         $promotion->update($data);
         return response()->json($promotion);
+    }
+
+    /**
+     * PATCH /api/promotions/{id}/toggle
+     * Bật / Tắt trạng thái is_active của khuyến mãi
+     */
+    public function toggleStatus($id)
+    {
+        $promotion = Promotion::findOrFail($id);
+        $promotion->is_active = !$promotion->is_active;
+        $promotion->save();
+
+        return response()->json([
+            'id'        => $promotion->id,
+            'is_active' => $promotion->is_active,
+            'message'   => $promotion->is_active ? 'Đã kích hoạt khuyến mãi' : 'Đã ngừng khuyến mãi',
+        ]);
+    }
+
+    /** DELETE /api/promotions/{id} */
+    public function destroy($id)
+    {
+        Promotion::findOrFail($id)->delete();
+        return response()->json(['message' => 'Đã xóa khuyến mãi']);
     }
 
     /**
@@ -128,10 +153,4 @@ class PromotionController extends Controller
         ]);
     }
 
-    /** DELETE /api/promotions/{id} */
-    public function destroy($id)
-    {
-        Promotion::findOrFail($id)->delete();
-        return response()->json(['message' => 'Đã xóa khuyến mãi']);
-    }
 }
